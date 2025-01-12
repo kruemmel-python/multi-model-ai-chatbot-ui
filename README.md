@@ -57,7 +57,7 @@ Dieses Projekt bietet eine vielseitige Chatbot-Anwendung mit Unterstützung für
 
 1. **Repository klonen:**
    ```bash
-   git clone https://github.com/DeinUsername/Chatbot-mit-Bildanalyse.git
+   git clone https://github.com/kruemmel-python/multi-model-ai-chatbot-ui.git
    cd Chatbot-mit-Bildanalyse
    ```
 
@@ -78,7 +78,7 @@ Dieses Projekt bietet eine vielseitige Chatbot-Anwendung mit Unterstützung für
 
 4. **Anwendung starten:**
    ```bash
-   python script.py
+   python app.py
    ```
    Die Benutzeroberfläche ist nun unter [http://localhost:7479](http://localhost:7479) verfügbar.
 
