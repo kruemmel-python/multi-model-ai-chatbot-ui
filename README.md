@@ -1,159 +1,136 @@
-# Chatbot mit Bildanalyse
+# Chatbots mit Bild- und Audioanalyse im Webinterface
 
-## Inhaltsverzeichnis
-- [Einleitung](#einleitung)
-- [Funktionen](#funktionen)
-- [Voraussetzungen](#voraussetzungen)
-- [Installation](#installation)
-- [Konfiguration](#konfiguration)
-- [Verwendung](#verwendung)
-- [Ollama Einrichtung](#ollama-einrichtung)
-- [Fehlerbehebung](#fehlerbehebung)
-- [Zusätzliche Informationen](#zus%C3%A4tzliche-informationen)
-- [Beiträge](#beitr%C3%A4ge)
-
----
-
-## Einleitung
-
-Dieses Projekt bietet eine vielseitige Chatbot-Anwendung mit Unterstützung für verschiedene große Sprachmodelle (LLMs), einschließlich **Mistral**, **Gemini** und **Ollama**. Es ermöglicht Benutzern, Text- und Bildanfragen einzureichen, Chats zu speichern, zu verwalten und Bilder zu analysieren.
-
----
+Dieses Projekt implementiert eine leistungsstarke und vielseitige Chatbot-Plattform, die mehrere Modelle und KI-Dienste integriert, darunter **Mistral**, **Gemini** und **Ollama**. Die Plattform bietet eine intuitive Weboberfläche mit Funktionen für Text-, Bild- und Audioverarbeitung, unterstützt durch Gradio.
 
 ## Funktionen
 
-| Funktion                | Unterstützt von    |
-|-------------------------|--------------------|
-| Chat mit Text           | Mistral, Gemini   |
-| Bildanalyse            | Mistral, Gemini   |
-| Bildvergleich          | Mistral           |
-| OCR                    | Mistral           |
-| Datei-Uploads          | Ollama            |
-| Lokale Modellverarbeitung | Ollama            |
+### Allgemein
+- **Mehrere KI-Modelle**: Unterstützung für Mistral, Gemini und Ollama.
+- **Audioverarbeitung**: Automatische Sprach-zu-Text-Transkription mit OpenAI's Whisper-Modell.
+- **Bildanalyse**: Bildverarbeitung und Analyse mit Mistral und Gemini.
+- **OCR-Funktionalität**: Strukturierte Extraktion von Daten aus Dokumenten.
+- **Chat-Speicherung**: Speichern, Anzeigen und Löschen von Chats.
 
-### Beispielanwendungen
-- **Mistral Bildanalyse:** Laden Sie ein Bild hoch und geben Sie eine Beschreibung ein wie: *"Analysieren Sie dieses Diagramm und beschreiben Sie die Trends."*
-- **Gemini Bildbeschreibung:** Laden Sie ein Bild hoch und fragen Sie: *"Beschreiben Sie dieses Bild in einer poetischen Weise."*
-- **Ollama Textverarbeitung:** Laden Sie eine PDF-Datei hoch und lassen Sie deren Inhalt analysieren.
+### Spezifische Funktionen
+1. **Mistral Chatbot**
+   - Verarbeitung von Text-, Bild- und Audiodaten.
+   - Unterstützung von Bildvergleichen und Diagrammverstehen.
+   - Funktionen zur Umschreibung von Belegen und Dokumenten.
+   - OCR mit JSON-Ausgabe.
+2. **Gemini Chatbot**
+   - Bildverarbeitung mit kreativen Beschreibungen.
+   - Unterstützung für Audioverarbeitung.
+3. **Ollama Chatbot**
+   - Unterstützung für mehrere Modelle (z. B. phi4, llama2).
+   - Verarbeitung von PDF- und TXT-Dateien.
+   - Live-Ausgabe während der Verarbeitung.
 
----
+## Anforderungen
 
-## Voraussetzungen
+- **Python 3.12**
+- **CUDA** (optional für GPU-Unterstützung)
+- Installierte Python-Bibliotheken:
+  - `torch`
+  - `transformers`
+  - `gradio`
+  - `datasets`
+  - `requests`
+  - `pydub`
+  - `PyPDF2`
 
-- **Python:** Version 3.12 oder höher
-- **Erforderliche Bibliotheken:**
-  - Gradio: Benutzeroberfläche
-  - Mistral SDK: API-Integration
-  - PIL: Bildverarbeitung
-  - PyPDF2: PDF-Handling
-  - Andere Pakete: Siehe `requirements.txt`
-- **Mistral API-Schlüssel**: Registrierung unter [Mistral](https://mistral.ai).
-- **Gemini API-Schlüssel**: Registrierung unter [Google AI Studio](https://ai.google.dev/gemini-api/docs/models/gemini-v2?hl=de).
-- **Ollama:** Installation erforderlich (siehe [Ollama Website](https://ollama.ai)).
-
----
+Installieren Sie alle erforderlichen Pakete mit:
+```bash
+pip install torch transformers gradio datasets requests pydub PyPDF2
+```
 
 ## Installation
 
-1. **Repository klonen:**
+1. Klonen Sie das Repository:
    ```bash
    git clone https://github.com/kruemmel-python/multi-model-ai-chatbot-ui.git
-   cd Chatbot-mit-Bildanalyse
+   cd multi-model-ai-chatbot-ui
    ```
 
-2. **Erforderliche Pakete installieren:**
+2. Installieren Sie die Python-Abhängigkeiten:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **API-Schlüssel konfigurieren:**
-   - **Mistral:**
-     ```bash
-     export MISTRAL_API_KEY="Ihr_Mistral_API_Schlüssel"
-     ```
-   - **Gemini:**
-     ```bash
-     export GEMINI_API_KEY="Ihr_Gemini_API_Schlüssel"
-     ```
+3. Stellen Sie sicher, dass die Umgebungsvariablen für die API-Schlüssel gesetzt sind:
+   ```bash
+   export MISTRAL_API_KEY=<IhrMistralAPIKey>
+   export GEMINI_API_KEY=<IhrGeminiAPIKey>
+   ```
 
-4. **Anwendung starten:**
+4. Starten Sie die Anwendung:
    ```bash
    python app.py
    ```
-   Die Benutzeroberfläche ist nun unter [http://localhost:7479](http://localhost:7479) verfügbar.
+
+5. Rufen Sie die Weboberfläche unter `http://localhost:7779` auf.
+
+## Verwendung
+
+### Mistral Chatbot
+- **Textnachrichten senden**: Geben Sie Ihre Nachricht in das Textfeld ein und klicken Sie auf "Senden".
+- **Bildanalyse**: Laden Sie ein Bild hoch und klicken Sie auf "Bild Nachricht senden".
+- **Audioverarbeitung**: Laden Sie eine Audiodatei hoch, um den Textinhalt zu extrahieren.
+- **Bildvergleich**: Laden Sie zwei Bilder hoch, um Unterschiede zu analysieren.
+- **OCR und Dokumentumschreibung**: Laden Sie ein Bild eines Dokuments hoch, um strukturierte Daten oder eine Umschrift zu erhalten.
+
+### Gemini Chatbot
+- Ähnlich wie Mistral, mit Fokus auf kreative Bildbeschreibungen.
+
+### Ollama Chatbot
+- Wählen Sie ein Modell aus der Dropdown-Liste.
+- Geben Sie Text ein oder laden Sie eine Datei hoch (TXT oder PDF).
+- Starten Sie die Verarbeitung und verfolgen Sie die Live-Ausgabe.
+
+## Architektur
+
+Das Projekt ist modular aufgebaut und nutzt die folgenden Hauptkomponenten:
+
+1. **KI-Modelle**: 
+   - Mistral: Bild- und Chat-Analyse.
+   - Gemini: Generative KI für kreative Bild- und Textverarbeitung.
+   - Ollama: Vielseitige Text- und Dateiunterstützung.
+
+2. **Benutzeroberfläche**:
+   - Basierend auf Gradio mit Tabs für verschiedene Chatbot-Dienste.
+   - Unterstützung für Bild- und Dateiuploads.
+
+3. **Datenverarbeitung**:
+   - Audio: Konvertierung in WAV-Format und Transkription mit Whisper.
+   - Bild: Kodierung in Base64 für API-Anfragen.
+   - PDF/TXT: Textauszug und Verarbeitung.
+
+## Screenshots
+
+### Mistral
+![image](https://github.com/user-attachments/assets/2b389454-5310-4cc3-85cf-34dafff1477c)
+
+
+### Gemini
+![image](https://github.com/user-attachments/assets/c6878394-7ce5-467f-adbf-51917b0e10c8)
+
+
+### Ollama
+![image](https://github.com/user-attachments/assets/8a6bb073-f209-4c04-afb7-21730703719b)
+
+
+## Erweiterungen
+
+- **Integration weiterer Modelle**: Neue KI-Dienste können leicht hinzugefügt werden.
+- **Erweiterung der OCR-Funktionalität**: Unterstützung für mehrsprachige Dokumente.
+- **Verbesserte Benutzeroberfläche**: Fortschrittsanzeigen und erweiterte Chat-Optionen.
+
+## Lizenz
+
+Dieses Projekt steht unter der MIT-Lizenz. Weitere Informationen finden Sie in der [LICENSE](LICENSE)-Datei.
+
+## Kontakt
+
+Für Fragen oder Vorschläge wenden Sie sich bitte an [Ihre E-Mail-Adresse] oder erstellen Sie ein Issue auf GitHub.
 
 ---
-
-## Konfiguration
-
-### Ollama Einrichtung
-
-1. **Ollama installieren:**
-   Befolgen Sie die Installationsanweisungen auf der [Ollama Website](https://ollama.ai/search)).
-
-2. **Modelle herunterladen:**
-   Verwenden Sie die folgenden Befehle, um die benötigten Modelle herunterzuladen:
-   ```bash
-   ollama run mistral
-   ollama run phi4
-   ollama run llama3.3
-   ollama run dolphin-mistral
-   ```
-   Laden Sie weitere Modelle entsprechend Ihren Anforderungen herunter.
-
-3. **Ollama Chatbot verwenden:**
-   - Wählen Sie ein Modell aus der Dropdown-Liste in der Registerkarte "Ollama Chatbot".
-   - Geben Sie Ihre Anfrage ein oder laden Sie eine TXT-/PDF-Datei hoch.
-   - Klicken Sie auf "Senden", um die Antwort zu generieren.
-
----
-
-## Fehlerbehebung
-
-### Typische Probleme und Lösungen
-
-1. **Fehler:** `MISTRAL_API_KEY nicht gesetzt`
-   - **Lösung:** Stellen Sie sicher, dass die Umgebungsvariable korrekt konfiguriert ist.
-     ```bash
-     export MISTRAL_API_KEY="Ihr_Mistral_API_Schlüssel"
-     ```
-
-2. **Problem:** `Ollama Modelle nicht gefunden`
-   - **Lösung:** Laden Sie die Modelle mit dem Befehl `ollama pull` herunter.
-
-3. **Fehler bei Bildanalyse:**
-   - **Lösung:** Prüfen Sie, ob das hochgeladene Bild im unterstützten Format (JPEG/PNG) vorliegt.
-
----
-
-## Zusätzliche Informationen
-
-- **Sicherheit:**
-  - Vermeiden Sie es, API-Schlüssel direkt im Code zu speichern.
-  - Nutzen Sie Umgebungsvariablen oder sichere Speichermethoden.
-
-- **Dateispeicher:**
-  - Das Skript speichert Chatverläufe lokal im Verzeichnis `.gradio`.
-
-- **Live-Ausgabe:**
-  - Die Benutzeroberfläche zeigt live generierte Antworten für ein dynamisches Erlebnis an.
-
----
-
-## Beiträge
-
-Beiträge zu diesem Projekt sind willkommen! Bitte folgen Sie diesen Schritten:
-
-1. **Repository forken** und einen neuen Branch erstellen:
-   ```bash
-   git checkout -b feature/neue-funktion
-   ```
-
-2. Änderungen vornehmen und testen.
-
-3. Pull-Request erstellen mit einer Beschreibung der Änderungen.
-
----
-
-Viel Spaß beim Chatten und Analysieren!
 
