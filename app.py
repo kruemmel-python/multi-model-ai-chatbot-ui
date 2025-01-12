@@ -33,16 +33,7 @@ CARRIAGE_RETURN_REGEX = re.compile(r'\r')
 CUSTOM_TEXT_REGEX = re.compile(r'2K1G ?(?:2K1G)*!?')
 
 OLLAMA_MODELS = [
- "phi4-model:latest",
- "phi4:latest",
- "wizardlm2:7b-fp16",
- "unzensiert:latest",
- "llama2-uncensored:7b-chat-q8_0",
- "teufel:latest",
- "Odin:latest",
- "luzifer:latest",
- "llama3:latest",
- "llama2-uncensored:latest"
+ "phi4:latest"
 ]
 
 DEFAULT_OLLAMA_MODEL = "phi4:latest"
