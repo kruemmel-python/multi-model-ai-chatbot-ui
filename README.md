@@ -48,7 +48,7 @@ Dieses Projekt bietet eine vielseitige Chatbot-Anwendung mit Unterstützung für
   - PyPDF2: PDF-Handling
   - Andere Pakete: Siehe `requirements.txt`
 - **Mistral API-Schlüssel**: Registrierung unter [Mistral](https://mistral.ai).
-- **Gemini API-Schlüssel**: Registrierung unter [Google AI Studio](https://ai.google/studio).
+- **Gemini API-Schlüssel**: Registrierung unter [Google AI Studio](https://ai.google.dev/gemini-api/docs/models/gemini-v2?hl=de).
 - **Ollama:** Installation erforderlich (siehe [Ollama Website](https://ollama.ai)).
 
 ---
