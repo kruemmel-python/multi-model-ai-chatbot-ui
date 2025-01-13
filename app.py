@@ -45,8 +45,8 @@ pipe = pipeline(
 )
 
 # --- API-Schlüssel und Modelle ---
-mistral_api_key = os.environ.get('MISTRAL_API_KEY', 'V14vkMTpfJN8GebRniiNMjtgzgfxWEYp')
-gemini_api_key = os.environ.get('GEMINI_API_KEY', 'AIzaSyCQ0xd71zVQgtIBHTl6MfOrs3KKQTStySU')
+mistral_api_key = os.environ.get('MISTRAL_API_KEY', 'key')
+gemini_api_key = os.environ.get('GEMINI_API_KEY', 'key')
 
 MISTRAL_CHAT_MODEL = "mistral-large-latest"
 MISTRAL_IMAGE_MODEL = "pixtral-12b-2409"
