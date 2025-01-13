@@ -1,7 +1,12 @@
+import os
 import torch
+from openpyxl import Workbook
+from docx import Document
+from fpdf import FPDF
+from pptx import Presentation
+import csv
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 from datasets import load_dataset
-import os
 import gradio as gr
 from PIL import Image
 import requests
@@ -40,8 +45,8 @@ pipe = pipeline(
 )
 
 # --- API-Schlüssel und Modelle ---
-mistral_api_key = os.environ.get('MISTRAL_API_KEY', 'API_Schlüssel')
-gemini_api_key = os.environ.get('GEMINI_API_KEY', 'API_Schlüssel')
+mistral_api_key = os.environ.get('MISTRAL_API_KEY', 'V14vkMTpfJN8GebRniiNMjtgzgfxWEYp')
+gemini_api_key = os.environ.get('GEMINI_API_KEY', 'AIzaSyCQ0xd71zVQgtIBHTl6MfOrs3KKQTStySU')
 
 MISTRAL_CHAT_MODEL = "mistral-large-latest"
 MISTRAL_IMAGE_MODEL = "pixtral-12b-2409"
@@ -108,6 +113,98 @@ def process_audio(audio_file_path: str) -> str:
         return result["text"]
     except Exception as e:
         raise ValueError(f"Fehler bei der Verarbeitung der Audiodatei: {e}")
+
+# --- Funktionen zur Dateierstellung ---
+def generate_content_with_model(model_name: str, user_prompt: str) -> str:
+    """Generiert den Inhalt basierend auf dem ausgewählten Modell."""
+    if model_name == "Mistral":
+        response = mistral_client.chat.complete(
+            model=MISTRAL_CHAT_MODEL,
+            messages=[{"role": "user", "content": user_prompt}]
+        )
+        return response.choices[0].message.content.strip()
+    elif model_name == "Gemini":
+        response = gemini_model.generate_content(prompt=user_prompt)
+        return response.text.strip()
+    elif model_name == "Ollama":
+        process = subprocess.Popen(
+            ["ollama", "run", DEFAULT_OLLAMA_MODEL],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True
+        )
+        process.stdin.write(user_prompt + "\n")
+        process.stdin.close()
+        output = process.stdout.read()
+        process.stdout.close()
+        return clean_output(output).strip()
+    else:
+        return "Modell nicht verfügbar oder unbekannt."
+
+def create_excel_with_ai(model_name: str, user_prompt: str, sheets: int = 1) -> str:
+    """Erstellt eine Excel-Datei mit von KI generiertem Inhalt."""
+    content = generate_content_with_model(model_name, user_prompt)
+    workbook = Workbook()
+    for i in range(sheets):
+        sheet = workbook.create_sheet(title=f"Tabelle{i+1}") if i > 0 else workbook.active
+        rows = content.split("\n")
+        for row_index, row in enumerate(rows, start=1):
+            columns = row.split(",")  # Annahme: Kommagetrennte Spalten
+            for col_index, value in enumerate(columns, start=1):
+                sheet.cell(row=row_index, column=col_index, value=value.strip())
+    file_path = "erstellte_tabelle.xlsx"
+    workbook.save(file_path)
+    os.startfile(file_path)  # Datei automatisch öffnen
+    return file_path
+
+def create_word_with_ai(model_name: str, user_prompt: str) -> str:
+    """Erstellt eine Word-Datei mit von KI generiertem Inhalt."""
+    content = generate_content_with_model(model_name, user_prompt)
+    doc = Document()
+    doc.add_paragraph(content)
+    file_path = "erstelltes_dokument.docx"
+    doc.save(file_path)
+    os.startfile(file_path)  # Datei automatisch öffnen
+    return file_path
+
+def create_pdf_with_ai(model_name: str, user_prompt: str) -> str:
+    """Erstellt eine PDF-Datei mit von KI generiertem Inhalt."""
+    content = generate_content_with_model(model_name, user_prompt)
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.multi_cell(0, 10, content)
+    file_path = "erstellte_datei.pdf"
+    pdf.output(file_path)
+    os.startfile(file_path)  # Datei automatisch öffnen
+    return file_path
+
+def create_ppt_with_ai(model_name: str, user_prompt: str) -> str:
+    """Erstellt eine PowerPoint-Datei mit von KI generiertem Inhalt."""
+    content = generate_content_with_model(model_name, user_prompt)
+    prs = Presentation()
+    slide_layout = prs.slide_layouts[1]
+    slide = prs.slides.add_slide(slide_layout)
+    title = slide.shapes.title
+    subtitle = slide.placeholders[1]
+    title.text = "Erstellte Präsentation"
+    subtitle.text = content
+    file_path = "erstellte_praesentation.pptx"
+    prs.save(file_path)
+    os.startfile(file_path)  # Datei automatisch öffnen
+    return file_path
+
+def create_csv_with_ai(model_name: str, user_prompt: str) -> str:
+    """Erstellt eine CSV-Datei mit von KI generiertem Inhalt."""
+    content = generate_content_with_model(model_name, user_prompt)
+    file_path = "erstellte_datei.csv"
+    with open(file_path, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        rows = content.split("\n")
+        for row in rows:
+            writer.writerow([col.strip() for col in row.split(",")])
+    os.startfile(file_path)  # Datei automatisch öffnen
+    return file_path
 
 # --- Mistral Funktionen ---
 def chat_with_mistral(user_input: str, chat_history: List[Tuple[str, str]], image: Optional[Image.Image] = None, audio_file: Optional[str] = None) -> Generator[Tuple[List[Tuple[str, str]], str], None, None]:
@@ -689,6 +786,32 @@ with gr.Blocks() as demo:
             ollama_submit_btn = gr.Button("Senden")
             ollama_submit_btn.click(chatbot_interface, inputs=[ollama_input_text, ollama_model_selector, ollama_file_upload, ollama_audio_upload], outputs=[ollama_output, ollama_status])
 
+        # --- Dateierstellung ---
+        with gr.TabItem("Dateierstellung"):
+            gr.Markdown("## Dateierstellung")
+            with gr.Row():
+                with gr.Column(scale=1):
+                    file_type = gr.Radio(choices=["Excel", "Word", "PDF", "PowerPoint", "CSV"], label="Dateiformat", value="Excel")
+                with gr.Column(scale=1):
+                    sheets = gr.Slider(minimum=1, maximum=5, step=1, label="Anzahl der Tabellenblätter (nur Excel)", value=1)
+                with gr.Column(scale=2):
+                    file_content = gr.Textbox(label="Inhalt der Datei", placeholder="Geben Sie den Inhalt der Datei ein...")
+                with gr.Column(scale=1):
+                    create_file_btn = gr.Button("Datei erstellen")
+                    download_file = gr.File(label="Herunterladen")
+
+            create_file_btn.click(
+                lambda content, file_format, sheets: (
+                    create_excel_with_ai("Mistral", content, sheets) if file_format == "Excel" else
+                    create_word_with_ai("Mistral", content) if file_format == "Word" else
+                    create_pdf_with_ai("Mistral", content) if file_format == "PDF" else
+                    create_ppt_with_ai("Mistral", content) if file_format == "PowerPoint" else
+                    create_csv_with_ai("Mistral", content)
+                ),
+                inputs=[file_content, file_type, sheets],
+                outputs=[download_file]
+            )
+
 # Starten Sie die Gradio-Benutzeroberfläche
 if __name__ == '__main__':
-    demo.launch(share=True, server_name="localhost", server_port=7779)
+    demo.launch(share=True, server_name="localhost", server_port=8779)
