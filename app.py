@@ -45,8 +45,8 @@ pipe = pipeline(
 )
 
 # --- API-Schlüssel und Modelle ---
-mistral_api_key = os.environ.get('MISTRAL_API_KEY', 'key')
-gemini_api_key = os.environ.get('GEMINI_API_KEY', 'key')
+mistral_api_key = os.environ.get('MISTRAL_API_KEY', 'KEY HERE')
+gemini_api_key = os.environ.get('GEMINI_API_KEY', 'KEY HERE')
 
 MISTRAL_CHAT_MODEL = "mistral-large-latest"
 MISTRAL_IMAGE_MODEL = "pixtral-12b-2409"
@@ -124,7 +124,7 @@ def generate_content_with_model(model_name: str, user_prompt: str) -> str:
         )
         return response.choices[0].message.content.strip()
     elif model_name == "Gemini":
-        response = gemini_model.generate_content(prompt=user_prompt)
+        response = gemini_model.generate_content([user_prompt])
         return response.text.strip()
     elif model_name == "Ollama":
         process = subprocess.Popen(
@@ -141,9 +141,10 @@ def generate_content_with_model(model_name: str, user_prompt: str) -> str:
     else:
         return "Modell nicht verfügbar oder unbekannt."
 
-def create_excel_with_ai(model_name: str, user_prompt: str, sheets: int = 1) -> str:
+
+def create_excel_with_ai(user_prompt: str, sheets: int = 1) -> str:
     """Erstellt eine Excel-Datei mit von KI generiertem Inhalt."""
-    content = generate_content_with_model(model_name, user_prompt)
+    content = generate_content_with_model("Gemini", user_prompt)
     workbook = Workbook()
     for i in range(sheets):
         sheet = workbook.create_sheet(title=f"Tabelle{i+1}") if i > 0 else workbook.active
@@ -157,9 +158,9 @@ def create_excel_with_ai(model_name: str, user_prompt: str, sheets: int = 1) -> 
     os.startfile(file_path)  # Datei automatisch öffnen
     return file_path
 
-def create_word_with_ai(model_name: str, user_prompt: str) -> str:
+def create_word_with_ai(user_prompt: str) -> str:
     """Erstellt eine Word-Datei mit von KI generiertem Inhalt."""
-    content = generate_content_with_model(model_name, user_prompt)
+    content = generate_content_with_model("Gemini", user_prompt)
     doc = Document()
     doc.add_paragraph(content)
     file_path = "erstelltes_dokument.docx"
@@ -167,9 +168,9 @@ def create_word_with_ai(model_name: str, user_prompt: str) -> str:
     os.startfile(file_path)  # Datei automatisch öffnen
     return file_path
 
-def create_pdf_with_ai(model_name: str, user_prompt: str) -> str:
+def create_pdf_with_ai(user_prompt: str) -> str:
     """Erstellt eine PDF-Datei mit von KI generiertem Inhalt."""
-    content = generate_content_with_model(model_name, user_prompt)
+    content = generate_content_with_model("Gemini", user_prompt)
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
@@ -179,9 +180,9 @@ def create_pdf_with_ai(model_name: str, user_prompt: str) -> str:
     os.startfile(file_path)  # Datei automatisch öffnen
     return file_path
 
-def create_ppt_with_ai(model_name: str, user_prompt: str) -> str:
+def create_ppt_with_ai(user_prompt: str) -> str:
     """Erstellt eine PowerPoint-Datei mit von KI generiertem Inhalt."""
-    content = generate_content_with_model(model_name, user_prompt)
+    content = generate_content_with_model("Gemini", user_prompt)
     prs = Presentation()
     slide_layout = prs.slide_layouts[1]
     slide = prs.slides.add_slide(slide_layout)
@@ -194,9 +195,9 @@ def create_ppt_with_ai(model_name: str, user_prompt: str) -> str:
     os.startfile(file_path)  # Datei automatisch öffnen
     return file_path
 
-def create_csv_with_ai(model_name: str, user_prompt: str) -> str:
+def create_csv_with_ai(user_prompt: str) -> str:
     """Erstellt eine CSV-Datei mit von KI generiertem Inhalt."""
-    content = generate_content_with_model(model_name, user_prompt)
+    content = generate_content_with_model("Gemini", user_prompt)
     file_path = "erstellte_datei.csv"
     with open(file_path, mode='w', newline='') as file:
         writer = csv.writer(file)
@@ -802,11 +803,11 @@ with gr.Blocks() as demo:
 
             create_file_btn.click(
                 lambda content, file_format, sheets: (
-                    create_excel_with_ai("Mistral", content, sheets) if file_format == "Excel" else
-                    create_word_with_ai("Mistral", content) if file_format == "Word" else
-                    create_pdf_with_ai("Mistral", content) if file_format == "PDF" else
-                    create_ppt_with_ai("Mistral", content) if file_format == "PowerPoint" else
-                    create_csv_with_ai("Mistral", content)
+                    create_excel_with_ai(content, sheets) if file_format == "Excel" else
+                    create_word_with_ai(content) if file_format == "Word" else
+                    create_pdf_with_ai(content) if file_format == "PDF" else
+                    create_ppt_with_ai(content) if file_format == "PowerPoint" else
+                    create_csv_with_ai(content)
                 ),
                 inputs=[file_content, file_type, sheets],
                 outputs=[download_file]
