@@ -117,6 +117,10 @@ Das Projekt ist modular aufgebaut und nutzt die folgenden Hauptkomponenten:
 ### Ollama
 ![image](https://github.com/user-attachments/assets/8a6bb073-f209-4c04-afb7-21730703719b)
 
+### Dateien (Inhalt wird an Mistral gesendet und in ausgewähltem Dokument gespeichert und geöffnet)
+![image](https://github.com/user-attachments/assets/1970ed41-6986-49e8-b127-d39384735c16)
+
+
 
 ## Erweiterungen
 
