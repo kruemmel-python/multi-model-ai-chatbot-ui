@@ -189,13 +189,14 @@ def create_gradio_interface():
             with gr.TabItem("Ollama Chatbot"):
                 ollama_input_text = gr.Textbox(lines=2, placeholder="Geben Sie Ihre Frage an Ollama ein", label="Eingabe (oder Datei hochladen)")
                 ollama_model_selector = gr.Dropdown(choices=OLLAMA_MODELS, value=DEFAULT_OLLAMA_MODEL, label="Modell auswählen")
-                ollama_file_upload = gr.File(label="Datei hochladen (PDF oder TXT)", file_types=[".txt", ".pdf"])
+                ollama_file_upload1 = gr.File(label="Datei 1 hochladen (PDF oder TXT)", file_types=[".txt", ".pdf"])
+                ollama_file_upload2 = gr.File(label="Datei 2 hochladen (PDF oder TXT)", file_types=[".txt", ".pdf"])
                 ollama_audio_upload = gr.Audio(type="filepath", label="Audio hochladen")
                 ollama_output = gr.Markdown(label="Antwort")
                 ollama_status = gr.Label(label="Status")
 
                 ollama_submit_btn = gr.Button("Senden")
-                ollama_submit_btn.click(ollama_functions.chatbot_interface, inputs=[ollama_input_text, ollama_model_selector, ollama_file_upload, ollama_audio_upload], outputs=[ollama_output, ollama_status])
+                ollama_submit_btn.click(ollama_functions.chatbot_interface, inputs=[ollama_input_text, ollama_model_selector, ollama_file_upload1, ollama_file_upload2, ollama_audio_upload], outputs=[ollama_output, ollama_status])
 
             # --- Dateierstellung ---
             with gr.TabItem("Dateierstellung"):
