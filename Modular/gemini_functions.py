@@ -7,17 +7,38 @@ import os
 import google.generativeai as genai
 
 class GeminiFunctions:
+    """
+    Eine Klasse zur Integration und Nutzung von Gemini-Funktionen, einschließlich
+    Bild-Upload, Chat-Interaktionen und Bildanalyse.
+    """
+
     def __init__(self):
+        """Initialisiert eine Instanz der GeminiFunctions-Klasse."""
         pass
 
     def upload_to_gemini(self, image: Image.Image):
-        """Lädt ein Bild zur Gemini API hoch."""
+        """
+        Lädt ein Bild zur Gemini API hoch.
+
+        Args:
+            image (Image.Image): Das hochzuladende Bild.
+
+        Returns:
+            object: Informationen über die hochgeladene Datei.
+
+        Raises:
+            Exception: Bei Fehlern während des Uploads.
+        """
         image_path = "temp_image.jpg"
+        # Bild temporär speichern, um es hochzuladen.
         image.save(image_path)
-        sample_file = genai.upload_file(path=image_path, display_name="Hochgeladenes Bild")
-        print(f"Hochgeladene Datei '{sample_file.display_name}' as: {sample_file.uri}")
-        os.remove(image_path)
-        return sample_file
+        try:
+            sample_file = genai.upload_file(path=image_path, display_name="Hochgeladenes Bild")
+            print(f"Hochgeladene Datei '{sample_file.display_name}' als: {sample_file.uri}")
+            return sample_file
+        finally:
+            # Temporäre Datei entfernen.
+            os.remove(image_path)
 
     def chat_with_gemini(
         self,
@@ -26,26 +47,40 @@ class GeminiFunctions:
         image: Optional[Image.Image] = None,
         audio_file: Optional[str] = None
     ) -> Generator[Tuple[List[Tuple[str, str]], str], None, None]:
+        """
+        Startet einen Chat mit Gemini unter Berücksichtigung von Eingabe, Bild und Audiodatei.
+
+        Args:
+            user_input (str): Die Texteingabe des Benutzers.
+            chat_history (List[Tuple[str, str]]): Der bisherige Chatverlauf.
+            image (Optional[Image.Image]): Ein optionales Bild für die Interaktion.
+            audio_file (Optional[str]): Eine optionale Audiodatei für die Interaktion.
+
+        Yields:
+            Tuple[List[Tuple[str, str]], str]: Aktualisierter Chatverlauf und Statusnachricht.
+        """
         if not user_input.strip() and not audio_file:
             yield chat_history, "Bitte geben Sie eine Nachricht ein oder laden Sie eine Audiodatei hoch."
             return
 
         if audio_file:
             try:
-                user_input = process_audio(audio_file)  # Audio in Text umwandeln
+                # Audiodatei in Text umwandeln.
+                user_input = process_audio(audio_file)
             except Exception as e:
                 chat_history.append((None, f"Fehler bei der Verarbeitung der Audiodatei: {e}"))
                 yield chat_history, ""
                 return
 
-        chat_history.append((user_input, None))
+        chat_history.append((user_input, None))  # Benutzer-Eingabe hinzufügen.
         yield chat_history, ""
 
-        # Chatverlauf initialisieren
+        # Initialisiere den Chatverlauf für Gemini.
         history = [{"role": "user", "parts": [user_input]}]
 
         if image:
             try:
+                # Bild zur Gemini-API hochladen und zum Verlauf hinzufügen.
                 sample_file = self.upload_to_gemini(image)
                 history[0]["parts"].append(sample_file)
             except Exception as e:
@@ -54,7 +89,7 @@ class GeminiFunctions:
                 return
 
         try:
-            # Chat mit Gemini starten
+            # Interaktion mit Gemini starten.
             chat_session = api_client.gemini_model.start_chat(history=history)
             response_text = chat_session.send_message(user_input).text
             chat_history.append((None, format_chat_message(response_text)))
@@ -63,14 +98,34 @@ class GeminiFunctions:
 
         yield chat_history, ""
 
-    def analyze_image_gemini(self, image: Optional[Image.Image], chat_history: List[Tuple[str, str]], user_input: str) -> List[Tuple[str, str]]:
-        """Analysiert ein Bild mit Gemini."""
+    def analyze_image_gemini(
+        self, 
+        image: Optional[Image.Image], 
+        chat_history: List[Tuple[str, str]], 
+        user_input: str
+    ) -> List[Tuple[str, str]]:
+        """
+        Analysiert ein Bild mit der Gemini-API.
+
+        Args:
+            image (Optional[Image.Image]): Das Bild, das analysiert werden soll.
+            chat_history (List[Tuple[str, str]]): Der bisherige Chatverlauf.
+            user_input (str): Benutzer-Input für die Bildanalyse.
+
+        Returns:
+            List[Tuple[str, str]]: Der aktualisierte Chatverlauf.
+        """
         if image is None:
             chat_history.append((None, "Bitte laden Sie ein Bild hoch."))
             return chat_history
+
         try:
+            # Bild hochladen und Anfrage an die Gemini-API senden.
             sample_file = self.upload_to_gemini(image)
-            response = api_client.gemini_model.generate_content([f"{user_input} Beschreiben Sie das Bild mit einer kreativen Beschreibung. Bitte in German antworten.", sample_file])
+            response = api_client.gemini_model.generate_content([
+                f"{user_input} Beschreiben Sie das Bild mit einer kreativen Beschreibung. Bitte in German antworten.",
+                sample_file
+            ])
             response_text = response.text
             chat_history.append((None, format_chat_message(response_text)))
         except Exception as e:
@@ -78,4 +133,5 @@ class GeminiFunctions:
 
         return chat_history
 
+# Instanziierung eines GeminiFunctions-Objekts.
 gemini_functions = GeminiFunctions()
