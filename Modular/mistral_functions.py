@@ -8,27 +8,53 @@ from config import MISTRAL_CHAT_MODEL, MISTRAL_IMAGE_MODEL, MISTRAL_API_URL, mis
 from audio_processing import process_audio
 
 class MistralFunctions:
+    """
+    Eine Klasse zur Interaktion mit der Mistral-API, einschließlich Chat, Bildanalyse und Bildvergleich.
+    """
+
     def __init__(self):
+        """Initialisiert eine Instanz der MistralFunctions-Klasse."""
         pass
 
-    def chat_with_mistral(self, user_input: str, chat_history: List[Tuple[str, str]], image: Optional[Image.Image] = None, audio_file: Optional[str] = None) -> Generator[Tuple[List[Tuple[str, str]], str], None, None]:
+    def chat_with_mistral(
+        self, 
+        user_input: str, 
+        chat_history: List[Tuple[str, str]], 
+        image: Optional[Image.Image] = None, 
+        audio_file: Optional[str] = None
+    ) -> Generator[Tuple[List[Tuple[str, str]], str], None, None]:
+        """
+        Führt einen Chat mit Mistral durch, unterstützt Text-, Bild- und Audioeingaben.
+
+        Args:
+            user_input (str): Der Textinput des Benutzers.
+            chat_history (List[Tuple[str, str]]): Der bisherige Chatverlauf.
+            image (Optional[Image.Image]): Ein optionales Bild für die Konversation.
+            audio_file (Optional[str]): Eine optionale Audiodatei für die Konversation.
+
+        Yields:
+            Tuple[List[Tuple[str, str]], str]: Aktualisierter Chatverlauf und Statusmeldung.
+        """
         if not user_input.strip() and not audio_file:
             yield chat_history, "Bitte geben Sie eine Nachricht ein oder laden Sie eine Audiodatei hoch."
             return
 
+        # Verarbeitung von Audiodateien
         if audio_file:
             try:
-                user_input = process_audio(audio_file)  # Audio in Text umwandeln
+                user_input = process_audio(audio_file)
             except Exception as e:
                 chat_history.append((None, f"Fehler bei der Verarbeitung der Audiodatei: {e}"))
                 yield chat_history, ""
                 return
 
+        # Benutzeranfrage zum Chatverlauf hinzufügen
         chat_history.append((user_input, None))
         yield chat_history, ""
 
         messages = [{"role": "user", "content": user_input}]
 
+        # Verarbeitung von Bildern
         if image:
             try:
                 image_base64 = encode_image(image)
@@ -41,13 +67,13 @@ class MistralFunctions:
                 yield chat_history, ""
                 return
 
+        # API-Anfrage an die Mistral-API senden
         try:
             headers = {
                 "Content-Type": "application/json",
                 "Accept": "application/json",
                 "Authorization": f"Bearer {mistral_api_key}",
             }
-
             payload = {
                 "model": MISTRAL_CHAT_MODEL,
                 "messages": messages,
@@ -61,24 +87,15 @@ class MistralFunctions:
             response.raise_for_status()
             full_response = ""
 
+            # Verarbeitung der Antwort in Echtzeit
             for chunk in response.iter_lines():
                 if chunk:
                     try:
-                        # Debug: Logge den ursprünglichen Chunk-Inhalt
-                        print(f"Empfangener Chunk: {chunk}")
-
-                        # Ignoriere den speziellen "[DONE]" Chunk
                         if chunk == b"data: [DONE]":
-                            print("Stream abgeschlossen (DONE).")
-                            break  # Beende die Verarbeitung
+                            break
 
-                        # Überprüfe, ob der Chunk nicht leer ist
                         if chunk.strip():
-                            # Versuche, den Chunk zu dekodieren
                             chunk_data = json.loads(chunk.decode('utf-8').replace('data: ', ''))
-                            print(f"Parsed JSON-Daten: {chunk_data}")
-
-                            # Verarbeite den JSON-Inhalt
                             if 'choices' in chunk_data and chunk_data['choices']:
                                 delta_content = chunk_data['choices'][0]['delta'].get('content', '')
                                 if delta_content:
@@ -86,14 +103,10 @@ class MistralFunctions:
                                     formatted_response = format_chat_message(full_response)
                                     chat_history[-1] = (user_input, formatted_response)
                                     yield chat_history, ""
-                    except json.JSONDecodeError as e:
-                        # Debug: Fehler bei der JSON-Verarbeitung
-                        print(f"JSON Decode Fehler: {e} - Ungültiger Chunk: {chunk}")
+                    except json.JSONDecodeError:
                         continue
-                else:
-                    # Debug: Leerer Chunk empfangen
-                    print("Leerer Chunk empfangen.")
 
+            # Abschlussnachricht oder Fehlermeldung
             if full_response:
                 chat_history[-1] = (user_input, format_chat_message(full_response))
                 yield chat_history, ""
@@ -107,8 +120,25 @@ class MistralFunctions:
             chat_history.append((None, f"Unbekannter Fehler: {e}. Bitte versuchen Sie es nochmal."))
             yield chat_history, ""
 
-    def analyze_image_mistral(self, image: Optional[Image.Image], chat_history: List[Tuple[str, str]], user_input: str, prompt: str) -> List[Tuple[str, str]]:
-        """Analysiert ein Bild mit Mistral."""
+    def analyze_image_mistral(
+        self, 
+        image: Optional[Image.Image], 
+        chat_history: List[Tuple[str, str]], 
+        user_input: str, 
+        prompt: str
+    ) -> List[Tuple[str, str]]:
+        """
+        Analysiert ein Bild mit Mistral.
+
+        Args:
+            image (Optional[Image.Image]): Das zu analysierende Bild.
+            chat_history (List[Tuple[str, str]]): Der bisherige Chatverlauf.
+            user_input (str): Der Benutzerinput.
+            prompt (str): Der spezifische Prompt für die Bildanalyse.
+
+        Returns:
+            List[Tuple[str, str]]: Der aktualisierte Chatverlauf.
+        """
         if image is None:
             chat_history.append((None, "Bitte laden Sie ein Bild hoch."))
             return chat_history
@@ -137,8 +167,23 @@ class MistralFunctions:
 
         return chat_history
 
-    def compare_images_mistral(self, image1: Optional[Image.Image], image2: Optional[Image.Image], chat_history: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
-        """Vergleicht zwei Bilder mit Mistral."""
+    def compare_images_mistral(
+        self, 
+        image1: Optional[Image.Image], 
+        image2: Optional[Image.Image], 
+        chat_history: List[Tuple[str, str]]
+    ) -> List[Tuple[str, str]]:
+        """
+        Vergleicht zwei Bilder mit Mistral.
+
+        Args:
+            image1 (Optional[Image.Image]): Das erste Bild.
+            image2 (Optional[Image.Image]): Das zweite Bild.
+            chat_history (List[Tuple[str, str]]): Der bisherige Chatverlauf.
+
+        Returns:
+            List[Tuple[str, str]]: Der aktualisierte Chatverlauf.
+        """
         if image1 is None or image2 is None:
             chat_history.append((None, "Bitte laden Sie zwei Bilder hoch."))
             return chat_history
@@ -169,4 +214,5 @@ class MistralFunctions:
 
         return chat_history
 
+# Instanziierung eines MistralFunctions-Objekts.
 mistral_functions = MistralFunctions()
