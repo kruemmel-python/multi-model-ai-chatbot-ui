@@ -113,3 +113,18 @@ Dieses Projekt steht unter der MIT-Lizenz. Weitere Informationen finden Sie in d
 
 Für Fragen oder Feedback können Sie sich gerne an [Ralf Krümmel](https://github.com/kruemmel-python) wenden.
 
+
+![image](https://github.com/user-attachments/assets/8efb3263-c088-4cf9-b149-33b74a0cfcd4)
+
+![image](https://github.com/user-attachments/assets/e00dac56-ad51-4403-9bac-e4a848ebe491)
+
+![image](https://github.com/user-attachments/assets/874f01a7-a795-4e66-acd3-797388dc39e2)
+
+![image](https://github.com/user-attachments/assets/3bcb55c3-a7d7-413b-8e8f-4f0ce3958298)
+
+![image](https://github.com/user-attachments/assets/49ec11ec-29ea-4a45-b788-14c6f208462f)
+
+
+
+
+
