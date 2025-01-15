@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Installationsdokumentation</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; line-height: 1.6; }
+        h1, h2, h3 { color: #333; }
+        h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h2 { margin-top: 30px; }
+        h3 { margin-top: 20px; }
+        ul, ol { margin-bottom: 20px; }
+        li { margin-bottom: 8px; }
+        code { background: #f4f4f4; padding: 2px 5px; border-radius: 3px; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        .important { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>Installationsdokumentation</h1>
+
+    <p>Diese Dokumentation führt Sie durch den Installationsprozess aller benötigten Komponenten und Bibliotheken, um die Anwendung auszuführen. Bitte folgen Sie den Anweisungen Schritt für Schritt.</p>
+
+    <h2>1. Voraussetzungen</h2>
+
+    <ul>
+        <li>Python 3.9 oder höher muss installiert sein.</li>
+        <li>Ein funktionierendes Internetverbindung.</li>
+        <li>Ein Texteditor oder eine IDE Ihrer Wahl.</li>
+    </ul>
+
+    <h2>2. Python Umgebung einrichten</h2>
+
+    <h3>2.1. Virtuelle Umgebung (Empfohlen)</h3>
+    <p>Es wird empfohlen, eine virtuelle Umgebung zu verwenden, um Abhängigkeiten für dieses Projekt zu isolieren.</p>
+    <ol>
+        <li>
+            Erstellen Sie eine virtuelle Umgebung:
+            <pre><code>python -m venv venv</code></pre>
+        </li>
+        <li>
+           Aktivieren Sie die virtuelle Umgebung:
+           <ul>
+                <li>
+                    <strong>Windows:</strong>
+                     <pre><code>.\venv\Scripts\activate</code></pre>
+                </li>
+                <li>
+                    <strong>macOS/Linux:</strong>
+                     <pre><code>source venv/bin/activate</code></pre>
+                </li>
+           </ul>
+        </li>
+    </ol>
+
+
+    <h2>3. Installation von Ollama</h2>
+    <p>Ollama ist notwendig, um lokale Sprachmodelle auszuführen.</p>
+
+    <h3>3.1. Ollama installieren</h3>
+    <p>Besuchen Sie die <a href="https://ollama.com/">Ollama Website</a> und laden Sie die passende Version für Ihr Betriebssystem herunter. Befolgen Sie die Anweisungen auf der Webseite, um Ollama zu installieren. Nach der Installation können Sie Ollama über die Befehlszeile verwenden.</p>
+
+    <h3>3.2. Ollama Modelle herunterladen</h3>
+    <p>Nach der Installation von Ollama müssen die benötigten Modelle heruntergeladen werden. Eine Liste der verfügbaren Modelle finden Sie im <code>config.py</code> oder auf der offiziellen Ollama Website. Um ein Modell herunterzuladen, führen Sie folgenden Befehl in der Konsole aus:</p>
+     <pre><code>ollama pull phi4:latest</code></pre>
+     <p>Ersetzen Sie <code>phi4:latest</code> mit dem gewünschten Modell.</p>
+
+    <h2>4. API Keys</h2>
+
+    <h3>4.1. Mistral API Key</h3>
+    <p>
+      Um die Mistral API zu verwenden, benötigen Sie einen API-Schlüssel.
+        <ol>
+          <li>
+            Besuchen Sie die <a href="https://console.mistral.ai/api-keys">Mistral API Keys Seite</a>.
+          </li>
+          <li>
+            Melden Sie sich an oder erstellen Sie ein Konto.
+          </li>
+            <li>
+            Erstellen Sie einen neuen API-Schlüssel und kopieren Sie ihn.
+          </li>
+        </ol>
+      Speichern Sie diesen API-Schlüssel in der <code>.env</code> Datei als <code>MISTRAL_API_KEY</code>.
+    </p>
+
+    <h3>4.2. Gemini API Key</h3>
+        <p>
+      Um die Google Gemini API zu verwenden, benötigen Sie einen API-Schlüssel.
+        <ol>
+          <li>
+            Besuchen Sie die <a href="https://ai.google.dev/">Google AI Seite</a>.
+          </li>
+          <li>
+            Melden Sie sich an oder erstellen Sie ein Konto.
+          </li>
+            <li>
+            Erstellen Sie einen neuen API-Schlüssel und kopieren Sie ihn.
+          </li>
+        </ol>
+        Speichern Sie diesen API-Schlüssel in der <code>.env</code> Datei als <code>GEMINI_API_KEY</code>.
+    </p>
+
+    <h2>5. Python Bibliotheken installieren</h2>
+    <p>Die folgenden Python-Bibliotheken werden benötigt. Führen Sie diesen Befehl aus, nachdem Sie die virtuelle Umgebung aktiviert haben:</p>
+
+    <pre><code>pip install -r requirements.txt</code></pre>
+    <p>Falls <code>requirements.txt</code> nicht vorhanden ist oder Sie die Bibliotheken manuell installieren möchten, installieren Sie diese einzeln mit <code>pip install</code>:</p>
+    <ul>
+       <li><code>mistralai</code></li>
+       <li><code>google-generativeai</code></li>
+       <li><code>pydub</code></li>
+       <li><code>gradio</code></li>
+       <li><code>pygments</code></li>
+       <li><code>python-dotenv</code></li>
+       <li><code>black</code></li>
+       <li><code>openpyxl</code></li>
+       <li><code>python-docx</code></li>
+       <li><code>fpdf</code></li>
+       <li><code>python-pptx</code></li>
+       <li><code>transformers</code></li>
+       <li><code>torch</code></li>
+       <li><code>Pillow</code></li>
+       <li><code>playsound</code></li>
+       <li><code>gTTS</code></li>
+       <li><code>PyPDF2</code></li>
+       <li><code>loguru</code></li>
+        <li><code>requests</code></li>
+    </ul>
+
+    <h2>6. Konfiguration der .env Datei</h2>
+     <p>
+        Erstellen Sie eine Datei namens <code>.env</code> im Hauptverzeichnis des Projekts. Fügen Sie die API-Schlüssel wie folgt hinzu:
+         <pre><code>MISTRAL_API_KEY=Ihr_Mistral_API_Schlüssel
+GEMINI_API_KEY=Ihr_Gemini_API_Schlüssel
+</code></pre>
+        <span class="important">Ersetzen Sie <code>Ihr_Mistral_API_Schlüssel</code> und <code>Ihr_Gemini_API_Schlüssel</code> mit Ihren tatsächlichen API-Schlüsseln.</span>
+    </p>
+
+    <h2>7. Anwendung starten</h2>
+    <p>Um die Anwendung zu starten, führen Sie den folgenden Befehl im Hauptverzeichnis aus:</p>
+
+     <pre><code>python gradio_interface.py</code></pre>
+    <p>Dadurch wird die Gradio-Benutzeroberfläche in Ihrem Webbrowser geöffnet.</p>
+
+    <h2>8. Optional: TTS Voice ändern</h2>
+    <p>
+         Die Standard TTS-Stimme ist auf Alex von Apple eingestellt. Um dies zu ändern, passen Sie den Wert von <code>tts_voice</code> im <code>config.py</code> an. Eine Liste mit den verfügbaren Stimmen können Sie via <code>say -v ?</code> in der Konsole abrufen.
+    </p>
+
+    <h2>9. Fehlerbehebung</h2>
+
+    <ul>
+        <li><strong>Fehler beim Starten:</strong> Stellen Sie sicher, dass alle Bibliotheken installiert sind und die Umgebungsvariablen korrekt gesetzt sind. Überprüfen Sie die Konsolenausgabe auf Fehlermeldungen.</li>
+         <li><strong>Ollama Modelle:</strong> Stellen Sie sicher, dass Sie die gewünschten Modelle heruntergeladen haben.</li>
+        <li><strong>API Fehler:</strong> Stellen Sie sicher, dass Ihre API-Schlüssel korrekt sind.</li>
+    </ul>
+
+    <p>Wenn Sie auf Probleme stoßen, konsultieren Sie die Dokumentation der einzelnen Bibliotheken oder suchen Sie nach Lösungen im Internet.</p>
+
+</body>
+</html>
+
