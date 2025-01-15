@@ -1,0 +1,17 @@
+mistralai
+google-generativeai
+pydub
+openpyxl
+python-docx
+fpdf
+python-pptx
+csv
+gradio
+pygments
+python-dotenv
+loguru
+black
+transformers
+torch
+PyPDF2
+requests
