@@ -1,0 +1,2197 @@
+# Inhalt der Datei: api_client.py
+################################################################################
+from mistralai import Mistral
+import google.generativeai as genai
+from config import mistral_api_key, gemini_api_key
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+class APIClient:
+    """
+    Klasse zur Verwaltung der API-Clients für Mistral und Gemini.
+
+    Diese Klasse initialisiert die API-Clients für Mistral und Gemini mithilfe der bereitgestellten API-Schlüssel.
+    Sie stellt sicher, dass die Clients korrekt konfiguriert sind und bereit für die Verwendung in anderen Teilen der Anwendung.
+
+    Attributes:
+        mistral_client (Mistral): Der Mistral API-Client.
+        gemini_model (genai.GenerativeModel): Das Gemini-Modell für die Generierung von Inhalten.
+    """
+
+    def __init__(self, mistral_api_key: str, gemini_api_key: str):
+        """
+        Initialisiert die API-Clients für Mistral und Gemini.
+
+        Args:
+            mistral_api_key (str): Der API-Schlüssel für Mistral.
+            gemini_api_key (str): Der API-Schlüssel für Gemini.
+
+        Raises:
+            Exception: Wenn die Initialisierung der API-Clients fehlschlägt.
+        """
+        try:
+            self.mistral_client = Mistral(api_key=mistral_api_key)
+            genai.configure(api_key=gemini_api_key)
+            self.gemini_model = genai.GenerativeModel(
+                model_name="gemini-2.0-flash-exp",
+                generation_config={
+                    "temperature": 1,
+                    "top_p": 0.95,
+                    "top_k": 40,
+                    "max_output_tokens": 16192,
+                    "response_mime_type": "text/plain",
+                },
+            )
+        except Exception as e:
+            logger.error(f"Fehler beim Initialisieren der API-Clients: {e}")
+            raise
+
+api_client = APIClient(mistral_api_key, gemini_api_key)
+
+
+# Inhalt der Datei: audio_processing.py
+################################################################################
+from pydub import AudioSegment
+import os
+from model_pipeline import model_pipeline
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+def process_audio(audio_file_path: str) -> str:
+    """
+    Verarbeitet eine Audiodatei und extrahiert den Text.
+
+    Diese Funktion konvertiert eine Audiodatei in das WAV-Format und verwendet dann die Modell-Pipeline,
+    um den Text aus der Audiodatei zu extrahieren.
+
+    Args:
+        audio_file_path (str): Der Pfad zur Audiodatei.
+
+    Returns:
+        str: Der extrahierte Text aus der Audiodatei.
+
+    Raises:
+        ValueError: Wenn die Verarbeitung der Audiodatei fehlschlägt.
+    """
+    try:
+        audio = AudioSegment.from_file(audio_file_path)
+        temp_audio_path = "temp_audio.wav"
+        audio.export(temp_audio_path, format="wav")
+        result = model_pipeline.pipe(temp_audio_path)
+        os.remove(temp_audio_path)
+        return result["text"]
+    except Exception as e:
+        logger.error(f"Fehler bei der Verarbeitung der Audiodatei: {e}")
+        raise ValueError(f"Fehler bei der Verarbeitung der Audiodatei: {e}")
+
+
+# Inhalt der Datei: chat_manager.py
+################################################################################
+import json
+from datetime import datetime
+from typing import List, Dict, Any, Tuple
+import os
+from config import SAVE_DIR, SAVE_FILE
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+class ChatManager:
+    """
+    Klasse zur Verwaltung von Chat-Verläufen.
+
+    Diese Klasse bietet Methoden zum Speichern, Laden, Löschen und Verwalten von Chat-Verläufen.
+    Sie stellt sicher, dass die Chat-Verläufe korrekt gespeichert und geladen werden können.
+
+    Attributes:
+        save_dir (str): Das Verzeichnis, in dem die Chat-Verläufe gespeichert werden.
+        save_file (str): Die Datei, in der die Chat-Verläufe gespeichert werden.
+    """
+
+    def __init__(self, save_dir: str, save_file: str):
+        """
+        Initialisiert den ChatManager mit den angegebenen Speicherorten.
+
+        Args:
+            save_dir (str): Das Verzeichnis, in dem die Chat-Verläufe gespeichert werden.
+            save_file (str): Die Datei, in der die Chat-Verläufe gespeichert werden.
+        """
+        self.save_dir = save_dir
+        self.save_file = save_file
+
+    def clear_chat(self, chat_history: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
+        """
+        Leert den Chatverlauf.
+
+        Args:
+            chat_history (List[Tuple[str, str]]): Der aktuelle Chatverlauf.
+
+        Returns:
+            List[Tuple[str, str]]: Der geleerte Chatverlauf.
+        """
+        chat_history.clear()
+        return chat_history
+
+    def generate_chat_title(self, chat_history: List[Tuple[str, str]]) -> str:
+        """
+        Generiert einen Titel basierend auf den ersten Chatnachrichten.
+
+        Args:
+            chat_history (List[Tuple[str, str]]): Der aktuelle Chatverlauf.
+
+        Returns:
+            str: Der generierte Titel für den Chat.
+        """
+        if not chat_history:
+            return "Neuer Chat"
+        first_messages = [msg[0] for msg in chat_history if msg[0] is not None][:2]
+        if not first_messages:
+            return "Neuer Chat"
+        title = " ".join(first_messages)
+        title = title[:50] + "..." if len(title) > 50 else title
+        return title
+
+    def save_chat(self, chat_history: List[Tuple[str, str]], saved_chats: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Speichert den aktuellen Chatverlauf.
+
+        Args:
+            chat_history (List[Tuple[str, str]]): Der aktuelle Chatverlauf.
+            saved_chats (List[Dict[str, Any]]): Die gespeicherten Chats.
+
+        Returns:
+            List[Dict[str, Any]]: Die aktualisierte Liste der gespeicherten Chats.
+        """
+        if not chat_history:
+            return saved_chats
+
+        title = self.generate_chat_title(chat_history)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        saved_chat = {
+            "title": title,
+            "date": timestamp,
+            "chat": chat_history,
+        }
+        saved_chats.append(saved_chat)
+        self._save_chats_to_file(saved_chats)
+        return saved_chats
+
+    def _save_chats_to_file(self, chats: List[Dict[str, Any]]):
+        """
+        Speichert Chatverläufe in einer JSON-Datei.
+
+        Args:
+            chats (List[Dict[str, Any]]): Die zu speichernden Chats.
+
+        Raises:
+            Exception: Wenn das Speichern der Chats fehlschlägt.
+        """
+        try:
+            os.makedirs(self.save_dir, exist_ok=True)
+            with open(self.save_file, 'w', encoding='utf-8') as f:
+                json.dump(chats, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            logger.error(f"Fehler beim Speichern der Chats: {e}")
+            raise
+
+    def _load_chats_from_file(self) -> List[Dict[str, Any]]:
+        """
+        Lädt Chatverläufe aus einer JSON-Datei.
+
+        Returns:
+            List[Dict[str, Any]]: Die geladenen Chats.
+        """
+        if os.path.exists(self.save_file):
+            try:
+                with open(self.save_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except json.JSONDecodeError as e:
+                logger.error(f"Fehler beim Laden der Chats: {e}")
+                return []
+        return []
+
+    def format_saved_chat(self, saved_chat: Dict[str, Any]) -> str:
+        """
+        Formatiert einen gespeicherten Chat für die Anzeige.
+
+        Args:
+            saved_chat (Dict[str, Any]): Der gespeicherte Chat.
+
+        Returns:
+            str: Der formatierte Chat für die Anzeige.
+        """
+        return f"**{saved_chat['title']}** ({saved_chat['date']})"
+
+    def load_chat(self, chat_title: str, saved_chats: List[Dict[str, Any]], chat_history: List[Tuple[str, str]]) -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]], str]:
+        """
+        Lädt einen Chat in die Chat-Ausgabe.
+
+        Args:
+            chat_title (str): Der Titel des zu ladenden Chats.
+            saved_chats (List[Dict[str, Any]]): Die gespeicherten Chats.
+            chat_history (List[Tuple[str, str]]): Der aktuelle Chatverlauf.
+
+        Returns:
+            Tuple[List[Tuple[str, str]], List[Tuple[str, str]], str]: Der geladene Chatverlauf und der Titel.
+        """
+        selected_chat = next((chat for chat in saved_chats if self.format_saved_chat(chat) == chat_title), None)
+        if selected_chat:
+            return selected_chat['chat'], selected_chat['chat'], chat_title
+        return chat_history, chat_history, None
+
+    def new_chat(self, saved_chats: List[Dict[str, Any]]) -> Tuple[List[Tuple[str, str]], List[Dict[str, Any]]]:
+        """
+        Startet einen neuen Chat.
+
+        Args:
+            saved_chats (List[Dict[str, Any]]): Die gespeicherten Chats.
+
+        Returns:
+            Tuple[List[Tuple[str, str]], List[Dict[str, Any]]]: Der neue Chatverlauf und die gespeicherten Chats.
+        """
+        return [], saved_chats
+
+    def delete_chat(self, chat_title: str, saved_chats: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Löscht einen einzelnen Chat.
+
+        Args:
+            chat_title (str): Der Titel des zu löschenden Chats.
+            saved_chats (List[Dict[str, Any]]): Die gespeicherten Chats.
+
+        Returns:
+            List[Dict[str, Any]]: Die aktualisierte Liste der gespeicherten Chats.
+        """
+        updated_chats = [chat for chat in saved_chats if self.format_saved_chat(chat) != chat_title]
+        self._save_chats_to_file(updated_chats)
+        return updated_chats
+
+    def delete_all_chats(self) -> List[Dict[str, Any]]:
+        """
+        Löscht alle gespeicherten Chats.
+
+        Returns:
+            List[Dict[str, Any]]: Die leere Liste der gespeicherten Chats.
+        """
+        self._save_chats_to_file([])
+        return []
+
+chat_manager = ChatManager(SAVE_DIR, SAVE_FILE)
+
+
+# Inhalt der Datei: codeeditor.py
+################################################################################
+import os
+import sys
+import logging
+import gradio as gr
+import google.generativeai as genai
+from pygments import highlight
+from pygments.lexers import PythonLexer
+from pygments.formatters import HtmlFormatter
+from dotenv import load_dotenv
+from functools import lru_cache
+from loguru import logger
+from black import format_str, FileMode
+from typing import Optional
+from logging_config import setup_logging
+
+# Setup Logging
+setup_logging()
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Gemini API Key Setup
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    logger.error("GEMINI_API_KEY ist nicht als Umgebungsvariable gesetzt.")
+    sys.exit(1)
+
+# Setup API
+def setup_api(gemini_api_key: str) -> Optional[genai.GenerativeModel]:
+    """
+    Konfiguriert die Gemini API mit dem bereitgestellten API-Schlüssel.
+
+    Args:
+        gemini_api_key (str): Der API-Schlüssel für Gemini.
+
+    Returns:
+        Optional[genai.GenerativeModel]: Das konfigurierte Gemini-Modell.
+
+    Raises:
+        SystemExit: Wenn die Konfiguration fehlschlägt.
+    """
+    try:
+        if not gemini_api_key:
+            raise ValueError("GEMINI_API_KEY ist ungültig oder leer.")
+
+        genai.configure(api_key=gemini_api_key)
+        model = genai.GenerativeModel('gemini-pro')
+        logger.info("Gemini API configured successfully.")
+        return model
+    except Exception as e:
+        logger.error(f"Fehler beim Konfigurieren der Gemini API: {e}")
+        sys.exit(1)
+
+# Configure Gemini API
+model = setup_api(GEMINI_API_KEY)
+
+# Helper functions
+def format_code(code_input: str) -> str:
+    """
+    Formatiert den gegebenen Python-Code mit Pygments.
+
+    Args:
+        code_input (str): Der Eingabe-Code.
+
+    Returns:
+        str: Der formatierte Code.
+    """
+    try:
+        formatter = HtmlFormatter(style='colorful')
+        highlighted_code = highlight(code_input, PythonLexer(), formatter)
+        return highlighted_code
+    except Exception as e:
+        logger.error(f"Fehler beim Formatieren des Codes: {e}")
+        return f"<pre>{code_input}</pre>"
+
+def save_code(code_input: str, filename: str) -> None:
+    """
+    Speichert den gegebenen Code in einer Datei.
+
+    Args:
+        code_input (str): Der Eingabe-Code.
+        filename (str): Der Dateiname.
+    """
+    with open(filename, 'w') as file:
+        file.write(code_input)
+
+def load_code(filename: str) -> str:
+    """
+    Lädt den Code aus einer Datei.
+
+    Args:
+        filename (str): Der Dateiname.
+
+    Returns:
+        str: Der geladene Code.
+    """
+    with open(filename, 'r') as file:
+        return file.read()
+
+def format_code_with_black(code_input: str) -> str:
+    """
+    Formatiert den gegebenen Code mit Black.
+
+    Args:
+        code_input (str): Der Eingabe-Code.
+
+    Returns:
+        str: Der formatierte Code.
+    """
+    try:
+        formatted_code = format_str(code_input, mode=FileMode())
+        return formatted_code
+    except Exception as e:
+        logger.error(f"Fehler beim Formatieren des Codes mit black: {e}")
+        return code_input
+
+# Gemini Functionality
+class GeminiFunctions:
+    """
+    Klasse zur Verwaltung der Gemini API-Funktionalitäten.
+
+    Diese Klasse bietet Methoden zur Analyse und Verbesserung von Python-Code mithilfe des Gemini-Modells.
+
+    Attributes:
+        model (genai.GenerativeModel): Das Gemini-Modell.
+    """
+
+    def __init__(self, model: genai.GenerativeModel):
+        """
+        Initialisiert die GeminiFunctions mit dem angegebenen Modell.
+
+        Args:
+            model (genai.GenerativeModel): Das Gemini-Modell.
+        """
+        self.model = model
+
+    @lru_cache(maxsize=100)
+    def analyze_code(self, code_input: str) -> str:
+        """
+        Analysiert den gegebenen Python-Code und gibt Feedback.
+
+        Args:
+            code_input (str): Der Eingabe-Code.
+
+        Returns:
+            str: Das Feedback zum Code.
+        """
+        try:
+            prompt = f"Analysiere diesen Python-Code und gib Feedback:\n\n{code_input}\n\nAntworte auf Deutsch und mit Zeilenumbrüchen."
+            response = self.model.generate_content(prompt)
+            return response.text if response is not None else "Fehler während der Analyse."
+        except Exception as e:
+            logger.error(f"Fehler während der Analyse: {e}")
+            return str(e)
+
+    @lru_cache(maxsize=100)
+    def suggest_code_improvements(self, code_input: str) -> str:
+        """
+        Schlägt Verbesserungen für den gegebenen Python-Code vor.
+
+        Args:
+            code_input (str): Der Eingabe-Code.
+
+        Returns:
+            str: Die vorgeschlagenen Verbesserungen.
+        """
+        try:
+            prompt = f"Schlage Verbesserungen für diesen Python-Code vor:\n\n{code_input}\n\nAntworte auf Deutsch und mit Zeilenumbrüchen."
+            response = self.model.generate_content(prompt)
+            return response.text if response is not None else "Fehler während der Generierung von Vorschlägen."
+        except Exception as e:
+            logger.error(f"Fehler während der Generierung von Vorschlägen: {e}")
+            return str(e)
+
+def update_model(model_name: str) -> None:
+    """
+    Aktualisiert das Gemini-Modell basierend auf der Auswahl.
+
+    Args:
+        model_name (str): Der Name des ausgewählten Modells.
+    """
+    global model
+    model = setup_api(GEMINI_API_KEY)
+    model.model_name = model_name
+
+gemini_functions = GeminiFunctions(model)
+
+# Gradio UI
+def create_app() -> gr.Blocks:
+    """
+    Erstellt die Gradio-Benutzeroberfläche.
+
+    Returns:
+        gr.Blocks: Die erstellte Gradio-Benutzeroberfläche.
+    """
+    with gr.Blocks(css="style.css") as app:
+        gr.Markdown("""
+        <h1>Code Analyzer & Generator mit Gemini AI</h1>
+        """, elem_classes="markdown-text")
+
+        # Input Code Editor
+        code_input = gr.Code(label="Code Eingabe", language="python", lines=10, elem_classes="code-output")
+
+        # Buttons
+        with gr.Row():
+            analyze_button = gr.Button("Code analysieren", variant="primary", elem_classes="button-font")
+            suggest_button = gr.Button("Vorschläge generieren", variant="secondary", elem_classes="button-font")
+
+        # Outputs
+        analysis_output = gr.Code(label="Analyse", language="python", lines=10, elem_classes="code-output")
+        suggestions_output = gr.Code(label="Vorschläge", language="python", lines=10, elem_classes="code-output")
+
+        # Button Click Events
+        analyze_button.click(fn=gemini_functions.analyze_code, inputs=code_input, outputs=analysis_output)
+        suggest_button.click(fn=gemini_functions.suggest_code_improvements, inputs=code_input, outputs=suggestions_output)
+
+        # Save and Load Code
+        save_button = gr.Button("Code speichern", variant="primary", elem_classes="button-font")
+        load_button = gr.Button("Code laden", variant="secondary", elem_classes="button-font")
+        filename_input = gr.Textbox(label="Dateiname", placeholder="Geben Sie den Dateinamen ein", elem_classes="code-output")
+
+        save_button.click(fn=save_code, inputs=[code_input, filename_input])
+        load_button.click(fn=load_code, inputs=filename_input, outputs=code_input)
+
+        # Model Selection
+        model_selection = gr.Dropdown(choices=["gemini-pro", "gemini-lite"], label="Gemini Modell", value="gemini-pro", elem_classes="code-output")
+        model_selection.change(fn=update_model, inputs=model_selection)
+
+        # Format Code with Black
+        format_button = gr.Button("Code mit black formatieren", variant="secondary", elem_classes="button-font")
+        format_button.click(fn=format_code_with_black, inputs=code_input, outputs=code_input)
+
+    return app
+
+# Run the App
+if __name__ == "__main__":
+    app = create_app()
+    app.launch(share=True, server_name="localhost", server_port=9560)
+
+
+# Inhalt der Datei: config.py
+################################################################################
+import os
+import torch
+
+# --- Konfiguration ---
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
+torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+
+model_id = "openai/whisper-large-v3-turbo"
+
+# --- API-Schlüssel und Modelle ---
+mistral_api_key = os.environ.get('MISTRAL_API_KEY', 'V14vkMTpfJN8GebRniiNMjtgzfxWEYp')
+gemini_api_key = os.environ.get('GEMINI_API_KEY', 'AIzaSyCQ0xd71zVQgtIBHTl6MfOrs3KKQTStySU')
+
+MISTRAL_CHAT_MODEL = "mistral-large-latest"
+MISTRAL_IMAGE_MODEL = "pixtral-12b-2409"
+
+MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions"
+
+OLLAMA_MODELS = [
+    "phi4-model:latest",
+    "phi4:latest",
+    "wizardlm2:7b-fp16",
+    "unzensiert:latest",
+    "llama2-uncensored:7b-chat-q8_0",
+    "teufel:latest",
+    "Odin:latest",
+    "luzifer:latest",
+    "llama2-uncensored:latest"
+]
+
+DEFAULT_OLLAMA_MODEL = "phi4:latest"
+STATUS_MESSAGE_GENERATING = "Antwort wird generiert..."
+STATUS_MESSAGE_COMPLETE = "Antwort generiert."
+STATUS_MESSAGE_ERROR = "Fehler: Die Anfrage konnte nicht verarbeitet werden."
+
+SAVE_DIR = ".gradio"
+SAVE_FILE = os.path.join(SAVE_DIR, "save.json")
+
+
+# Inhalt der Datei: file_creator.py
+################################################################################
+from openpyxl import Workbook
+from docx import Document
+from fpdf import FPDF
+from pptx import Presentation
+import csv
+from api_client import api_client
+from config import MISTRAL_CHAT_MODEL, DEFAULT_OLLAMA_MODEL
+import subprocess
+import re
+import os
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+class FileCreator:
+    """
+    Klasse zur Erstellung von Dateien mit von KI generiertem Inhalt.
+
+    Diese Klasse bietet Methoden zur Erstellung von Excel-, Word-, PDF-, PowerPoint- und CSV-Dateien
+    basierend auf dem ausgewählten Modell und dem bereitgestellten Inhalt.
+    """
+
+    def __init__(self):
+        """
+        Initialisiert den FileCreator.
+        """
+        pass
+
+    def generate_content_with_model(self, model_name: str, user_prompt: str) -> str:
+        """
+        Generiert den Inhalt basierend auf dem ausgewählten Modell.
+
+        Args:
+            model_name (str): Der Name des ausgewählten Modells.
+            user_prompt (str): Der Benutzerprompt zur Generierung des Inhalts.
+
+        Returns:
+            str: Der generierte Inhalt.
+
+        Raises:
+            Exception: Wenn die Generierung des Inhalts fehlschlägt.
+        """
+        try:
+            if model_name == "Mistral":
+                response = api_client.mistral_client.chat.complete(
+                    model=MISTRAL_CHAT_MODEL,
+                    messages=[{"role": "user", "content": user_prompt}]
+                )
+                return response.choices[0].message.content.strip()
+            elif model_name == "Gemini":
+                response = api_client.gemini_model.generate_content([user_prompt])
+                return response.text.strip()
+            elif model_name == "Ollama":
+                process = subprocess.Popen(
+                    ["ollama", "run", DEFAULT_OLLAMA_MODEL],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    text=True
+                )
+                process.stdin.write(user_prompt + "\n")
+                process.stdin.close()
+                output = process.stdout.read()
+                process.stdout.close()
+                return self.clean_output(output).strip()
+            else:
+                return "Modell nicht verfügbar oder unbekannt."
+        except Exception as e:
+            logger.error(f"Fehler beim Generieren des Inhalts: {e}")
+            raise
+
+    def clean_output(self, output: str) -> str:
+        """
+        Entfernt Steuerzeichen aus der Ollama-Ausgabe.
+
+        Args:
+            output (str): Die Ausgabe von Ollama.
+
+        Returns:
+            str: Die bereinigte Ausgabe.
+        """
+        cleaned_output = re.sub(r'(?:\x1B[@-_]|[\x1B\x9B][0-?]*[ -/]*[@-~])', '', output)
+        cleaned_output = re.sub(r'\?\d+[lh]', '', cleaned_output)
+        cleaned_output = re.sub(r'[\u2800-\u28FF]', '', cleaned_output)
+        cleaned_output = re.sub(r'\r', '', cleaned_output)
+        cleaned_output = re.sub(r'2K1G ?(?:2K1G)*!?', '', cleaned_output)
+        return cleaned_output
+
+    def create_excel_with_ai(self, user_prompt: str, sheets: int = 1) -> str:
+        """
+        Erstellt eine Excel-Datei mit von KI generiertem Inhalt.
+
+        Args:
+            user_prompt (str): Der Benutzerprompt zur Generierung des Inhalts.
+            sheets (int): Die Anzahl der Tabellenblätter.
+
+        Returns:
+            str: Der Pfad zur erstellten Excel-Datei.
+
+        Raises:
+            Exception: Wenn die Erstellung der Excel-Datei fehlschlägt.
+        """
+        try:
+            content = self.generate_content_with_model("Gemini", user_prompt)
+            workbook = Workbook()
+            for i in range(sheets):
+                sheet = workbook.create_sheet(title=f"Tabelle{i+1}") if i > 0 else workbook.active
+                rows = content.split("\n")
+                for row_index, row in enumerate(rows, start=1):
+                    columns = row.split(",")
+                    for col_index, value in enumerate(columns, start=1):
+                        sheet.cell(row=row_index, column=col_index, value=value.strip())
+            file_path = "erstellte_tabelle.xlsx"
+            workbook.save(file_path)
+            os.startfile(file_path)
+            return file_path
+        except Exception as e:
+            logger.error(f"Fehler beim Erstellen der Excel-Datei: {e}")
+            raise
+
+    def create_word_with_ai(self, user_prompt: str) -> str:
+        """
+        Erstellt eine Word-Datei mit von KI generiertem Inhalt.
+
+        Args:
+            user_prompt (str): Der Benutzerprompt zur Generierung des Inhalts.
+
+        Returns:
+            str: Der Pfad zur erstellten Word-Datei.
+
+        Raises:
+            Exception: Wenn die Erstellung der Word-Datei fehlschlägt.
+        """
+        try:
+            content = self.generate_content_with_model("Gemini", user_prompt)
+            doc = Document()
+            doc.add_paragraph(content)
+            file_path = "erstelltes_dokument.docx"
+            doc.save(file_path)
+            os.startfile(file_path)
+            return file_path
+        except Exception as e:
+            logger.error(f"Fehler beim Erstellen der Word-Datei: {e}")
+            raise
+
+    def create_pdf_with_ai(self, user_prompt: str) -> str:
+        """
+        Erstellt eine PDF-Datei mit von KI generiertem Inhalt.
+
+        Args:
+            user_prompt (str): Der Benutzerprompt zur Generierung des Inhalts.
+
+        Returns:
+            str: Der Pfad zur erstellten PDF-Datei.
+
+        Raises:
+            Exception: Wenn die Erstellung der PDF-Datei fehlschlägt.
+        """
+        try:
+            content = self.generate_content_with_model("Gemini", user_prompt)
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", size=12)
+            pdf.multi_cell(0, 10, content)
+            file_path = "erstellte_datei.pdf"
+            pdf.output(file_path)
+            os.startfile(file_path)
+            return file_path
+        except Exception as e:
+            logger.error(f"Fehler beim Erstellen der PDF-Datei: {e}")
+            raise
+
+    def create_ppt_with_ai(self, user_prompt: str) -> str:
+        """
+        Erstellt eine PowerPoint-Datei mit von KI generiertem Inhalt.
+
+        Args:
+            user_prompt (str): Der Benutzerprompt zur Generierung des Inhalts.
+
+        Returns:
+            str: Der Pfad zur erstellten PowerPoint-Datei.
+
+        Raises:
+            Exception: Wenn die Erstellung der PowerPoint-Datei fehlschlägt.
+        """
+        try:
+            content = self.generate_content_with_model("Gemini", user_prompt)
+            prs = Presentation()
+            slide_layout = prs.slide_layouts[1]
+            slide = prs.slides.add_slide(slide_layout)
+            title = slide.shapes.title
+            subtitle = slide.placeholders[1]
+            title.text = "Erstellte Präsentation"
+            subtitle.text = content
+            file_path = "erstellte_praesentation.pptx"
+            prs.save(file_path)
+            os.startfile(file_path)
+            return file_path
+        except Exception as e:
+            logger.error(f"Fehler beim Erstellen der PowerPoint-Datei: {e}")
+            raise
+
+    def create_csv_with_ai(self, user_prompt: str) -> str:
+        """
+        Erstellt eine CSV-Datei mit von KI generiertem Inhalt.
+
+        Args:
+            user_prompt (str): Der Benutzerprompt zur Generierung des Inhalts.
+
+        Returns:
+            str: Der Pfad zur erstellten CSV-Datei.
+
+        Raises:
+            Exception: Wenn die Erstellung der CSV-Datei fehlschlägt.
+        """
+        try:
+            content = self.generate_content_with_model("Gemini", user_prompt)
+            file_path = "erstellte_datei.csv"
+            with open(file_path, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                rows = content.split("\n")
+                for row in rows:
+                    writer.writerow([col.strip() for col in row.split(",")])
+            os.startfile(file_path)
+            return file_path
+        except Exception as e:
+            logger.error(f"Fehler beim Erstellen der CSV-Datei: {e}")
+            raise
+
+file_creator = FileCreator()
+
+
+# Inhalt der Datei: gemini_functions.py
+################################################################################
+from PIL import Image
+from typing import Optional, Generator, List, Tuple
+from helpers import encode_image, format_chat_message
+from api_client import api_client
+from audio_processing import process_audio
+import os
+import google.generativeai as genai
+from pygments import highlight
+from pygments.lexers import PythonLexer
+from pygments.formatters import HtmlFormatter
+from black import format_str, FileMode
+from functools import lru_cache
+from loguru import logger
+
+class GeminiFunctions:
+    """
+    Klasse zur Verwaltung der Gemini API-Funktionalitäten.
+
+    Diese Klasse bietet Methoden zur Analyse und Verbesserung von Python-Code mithilfe des Gemini-Modells.
+
+    Attributes:
+        model (genai.GenerativeModel): Das Gemini-Modell.
+    """
+
+    def __init__(self):
+        """
+        Initialisiert die GeminiFunctions.
+        """
+        pass
+
+    def upload_to_gemini(self, image: Image.Image):
+        """
+        Lädt ein Bild zur Gemini API hoch.
+
+        Args:
+            image (Image.Image): Das hochzuladende Bild.
+
+        Returns:
+            sample_file: Die hochgeladene Datei.
+
+        Raises:
+            Exception: Wenn das Hochladen des Bildes fehlschlägt.
+        """
+        try:
+            image_path = "temp_image.jpg"
+            image.save(image_path)
+            sample_file = genai.upload_file(path=image_path, display_name="Hochgeladenes Bild")
+            logger.info(f"Hochgeladene Datei '{sample_file.display_name}' as: {sample_file.uri}")
+            os.remove(image_path)
+            return sample_file
+        except Exception as e:
+            logger.error(f"Fehler beim Hochladen des Bildes: {e}")
+            raise
+
+    def chat_with_gemini(
+        self,
+        user_input: str,
+        chat_history: List[Tuple[str, str]],
+        image: Optional[Image.Image] = None,
+        audio_file: Optional[str] = None
+    ) -> Generator[Tuple[List[Tuple[str, str]], str], None, None]:
+        """
+        Chattet mit dem Gemini-Modell.
+
+        Args:
+            user_input (str): Die Benutzereingabe.
+            chat_history (List[Tuple[str, str]]): Der Chatverlauf.
+            image (Optional[Image.Image]): Das hochzuladende Bild.
+            audio_file (Optional[str]): Der Pfad zur Audiodatei.
+
+        Yields:
+            Tuple[List[Tuple[str, str]], str]: Der aktualisierte Chatverlauf und die Antwort.
+        """
+        if not user_input.strip() and not audio_file:
+            yield chat_history, "Bitte geben Sie eine Nachricht ein oder laden Sie eine Audiodatei hoch."
+            return
+
+        if audio_file:
+            try:
+                user_input = process_audio(audio_file)
+            except Exception as e:
+                chat_history.append((None, f"Fehler bei der Verarbeitung der Audiodatei: {e}"))
+                yield chat_history, ""
+                return
+
+        chat_history.append((user_input, None))
+        yield chat_history, ""
+
+        history = [{"role": "user", "parts": [user_input]}]
+
+        if image:
+            try:
+                sample_file = self.upload_to_gemini(image)
+                history[0]["parts"].append(sample_file)
+            except Exception as e:
+                chat_history.append((None, f"Fehler beim Hochladen des Bildes: {e}"))
+                yield chat_history, ""
+                return
+
+        try:
+            chat_session = api_client.gemini_model.start_chat(history=history)
+            response_text = chat_session.send_message(user_input).text
+            chat_history.append((None, format_chat_message(response_text)))
+        except Exception as e:
+            chat_history.append((None, f"Fehler bei der Verarbeitung der Anfrage: {e}"))
+
+        yield chat_history, ""
+
+    def analyze_image_gemini(self, image: Optional[Image.Image], chat_history: List[Tuple[str, str]], user_input: str) -> List[Tuple[str, str]]:
+        """
+        Analysiert ein Bild mit Gemini.
+
+        Args:
+            image (Optional[Image.Image]): Das zu analysierende Bild.
+            chat_history (List[Tuple[str, str]]): Der Chatverlauf.
+            user_input (str): Die Benutzereingabe.
+
+        Returns:
+            List[Tuple[str, str]]: Der aktualisierte Chatverlauf.
+        """
+        if image is None:
+            chat_history.append((None, "Bitte laden Sie ein Bild hoch."))
+            return chat_history
+        try:
+            sample_file = self.upload_to_gemini(image)
+            response = api_client.gemini_model.generate_content([f"{user_input} Beschreiben Sie das Bild mit einer kreativen Beschreibung. Bitte in German antworten.", sample_file])
+            response_text = response.text
+            chat_history.append((None, format_chat_message(response_text)))
+        except Exception as e:
+            chat_history.append((None, f"Fehler bei der Bildanalyse: {e}"))
+
+        return chat_history
+
+    def format_code(self, code_input: str) -> str:
+        """
+        Formatiert den gegebenen Python-Code mit Pygments.
+
+        Args:
+            code_input (str): Der Eingabe-Code.
+
+        Returns:
+            str: Der formatierte Code.
+        """
+        try:
+            formatter = HtmlFormatter(style='colorful')
+            highlighted_code = highlight(code_input, PythonLexer(), formatter)
+            return highlighted_code
+        except Exception as e:
+            logger.error(f"Fehler beim Formatieren des Codes: {e}")
+            return f"<pre>{code_input}</pre>"
+
+    def save_code(self, code_input: str, filename: str) -> None:
+        """
+        Speichert den gegebenen Code in einer Datei.
+
+        Args:
+            code_input (str): Der Eingabe-Code.
+            filename (str): Der Dateiname.
+        """
+        with open(filename, 'w') as file:
+            file.write(code_input)
+
+    def load_code(self, filename: str) -> str:
+        """
+        Lädt den Code aus einer Datei.
+
+        Args:
+            filename (str): Der Dateiname.
+
+        Returns:
+            str: Der geladene Code.
+        """
+        with open(filename, 'r') as file:
+            return file.read()
+
+    def format_code_with_black(self, code_input: str) -> str:
+        """
+        Formatiert den gegebenen Code mit Black.
+
+        Args:
+            code_input (str): Der Eingabe-Code.
+
+        Returns:
+            str: Der formatierte Code.
+        """
+        try:
+            formatted_code = format_str(code_input, mode=FileMode())
+            return formatted_code
+        except Exception as e:
+            logger.error(f"Fehler beim Formatieren des Codes mit black: {e}")
+            return code_input
+
+    @lru_cache(maxsize=100)
+    def analyze_code(self, code_input: str) -> str:
+        """
+        Analysiert den gegebenen Python-Code und gibt Feedback.
+
+        Args:
+            code_input (str): Der Eingabe-Code.
+
+        Returns:
+            str: Das Feedback zum Code.
+        """
+        try:
+            prompt = f"Analysiere diesen Python-Code und gib Feedback:\n\n{code_input}\n\nAntworte auf Deutsch und mit Zeilenumbrüchen."
+            response = api_client.gemini_model.generate_content(prompt)
+            return response.text if response is not None else "Fehler während der Analyse."
+        except Exception as e:
+            logger.error(f"Fehler während der Analyse: {e}")
+            return str(e)
+
+    @lru_cache(maxsize=100)
+    def suggest_code_improvements(self, code_input: str) -> str:
+        """
+        Schlägt Verbesserungen für den gegebenen Python-Code vor.
+
+        Args:
+            code_input (str): Der Eingabe-Code.
+
+        Returns:
+            str: Die vorgeschlagenen Verbesserungen.
+        """
+        try:
+            prompt = f"Schlage Verbesserungen für diesen Python-Code vor:\n\n{code_input}\n\nAntworte auf Deutsch und mit Zeilenumbrüchen."
+            response = api_client.gemini_model.generate_content(prompt)
+            return response.text if response is not None else "Fehler während der Generierung von Vorschlägen."
+        except Exception as e:
+            logger.error(f"Fehler während der Generierung von Vorschlägen: {e}")
+            return str(e)
+
+    def update_model(self, model_name: str) -> None:
+        """
+        Aktualisiert das Gemini-Modell basierend auf der Auswahl.
+
+        Args:
+            model_name (str): Der Name des ausgewählten Modells.
+        """
+        global model
+        model = setup_api(GEMINI_API_KEY)
+        model.model_name = model_name
+
+gemini_functions = GeminiFunctions()
+
+
+# Inhalt der Datei: gradio_interface.py
+################################################################################
+import gradio as gr
+from mistral_functions import mistral_functions
+from gemini_functions import gemini_functions
+from chat_manager import chat_manager
+from ollama_functions import ollama_functions
+from file_creator import file_creator
+from config import OLLAMA_MODELS, DEFAULT_OLLAMA_MODEL, STATUS_MESSAGE_GENERATING, STATUS_MESSAGE_COMPLETE, STATUS_MESSAGE_ERROR
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+def create_gradio_interface():
+    """
+    Erstellt die Gradio-Benutzeroberfläche.
+
+    Returns:
+        gr.Blocks: Die erstellte Gradio-Benutzeroberfläche.
+    """
+    with gr.Blocks() as demo:
+        gr.Markdown("## Chatbots mit Bild- und Audioanalyse")
+
+        with gr.Tabs():
+            # --- Mistral Chatbot ---
+            with gr.TabItem("Mistral Chatbot"):
+                mistral_chatbot = gr.Chatbot(label="Chat-Verlauf", height=400)
+                mistral_state = gr.State([])
+                mistral_saved_chats = gr.State(chat_manager._load_chats_from_file())
+
+                with gr.Row():
+                    with gr.Column(scale=5):
+                        mistral_user_input = gr.Textbox(label="Nachricht", placeholder="Geben Sie hier Ihre Nachricht ein...")
+                    with gr.Column(scale=1, min_width=100):
+                        mistral_submit_btn = gr.Button("Senden")
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        mistral_image_upload = gr.Image(type="pil", label="Bild hochladen", height=200)
+                    with gr.Column(scale=1):
+                        mistral_audio_upload = gr.Audio(type="filepath", label="Audio hochladen")
+                    with gr.Column(scale=1):
+                        mistral_analyze_btn = gr.Button("Bild mit Nachricht senden")
+
+                with gr.Row():
+                    mistral_clear_chat_button = gr.Button("Chat leeren")
+                    mistral_save_chat_button = gr.Button("Chat speichern")
+                    mistral_new_chat_button = gr.Button("Neuen Chat starten")
+
+                with gr.Accordion("Gespeicherte Chats", open=False):
+                    mistral_saved_chat_display = gr.Radio(label="Gespeicherte Chats", interactive=True)
+                    with gr.Row():
+                        mistral_delete_chat_button = gr.Button("Ausgewählten Chat löschen")
+                        mistral_delete_all_chats_button = gr.Button("Alle Chats löschen")
+
+                with gr.Tabs():
+                    with gr.TabItem("Bildanalyse"):
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                mistral_image_upload_analysis = gr.Image(type="pil", label="Bild hochladen", height=200)
+                            with gr.Column(scale=1):
+                                mistral_analyze_btn_analysis = gr.Button("Nur Bild analysieren")
+
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                mistral_analyze_btn_charts = gr.Button("Diagramme verstehen")
+                            with gr.Column(scale=1):
+                                mistral_analyze_btn_compare = gr.Button("Bilder vergleichen")
+                            with gr.Column(scale=1):
+                                mistral_analyze_btn_receipts = gr.Button("Belege umschreiben")
+                            with gr.Column(scale=1):
+                                mistral_analyze_btn_documents = gr.Button("Alte Dokumente umschreiben")
+                            with gr.Column(scale=1):
+                                mistral_analyze_btn_ocr = gr.Button("OCR mit strukturiertem Output")
+
+                    with gr.TabItem("Bildvergleich"):
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                mistral_image_upload_compare1 = gr.Image(type="pil", label="Bild 1 hochladen", height=200)
+                            with gr.Column(scale=1):
+                                mistral_image_upload_compare2 = gr.Image(type="pil", label="Bild 2 hochladen", height=200)
+                        with gr.Row():
+                            mistral_compare_btn = gr.Button("Bilder vergleichen")
+
+                mistral_submit_btn.click(
+                    mistral_functions.chat_with_mistral,
+                    inputs=[mistral_user_input, mistral_state, mistral_image_upload, mistral_audio_upload],
+                    outputs=[mistral_chatbot, mistral_user_input]
+                )
+
+                mistral_analyze_btn.click(
+                    lambda image, chat_history, user_input: mistral_functions.analyze_image_mistral(image, chat_history, user_input, "Beschreiben Sie das Bild mit einer kreativen Beschreibung. Bitte in Deutsch antworten."),
+                    inputs=[mistral_image_upload, mistral_state, mistral_user_input],
+                    outputs=[mistral_chatbot]
+                )
+                mistral_clear_chat_button.click(chat_manager.clear_chat, inputs=[mistral_state], outputs=[mistral_chatbot])
+                mistral_save_chat_button.click(chat_manager.save_chat, inputs=[mistral_state, mistral_saved_chats], outputs=[mistral_saved_chats])
+                mistral_new_chat_button.click(chat_manager.new_chat, inputs=[mistral_saved_chats], outputs=[mistral_chatbot, mistral_saved_chats])
+
+                def update_mistral_radio(chats):
+                    formatted_chats = [chat_manager.format_saved_chat(chat) for chat in chats]
+                    return gr.update(choices=formatted_chats)
+
+                mistral_saved_chats.change(update_mistral_radio, inputs=[mistral_saved_chats], outputs=[mistral_saved_chat_display])
+                mistral_saved_chat_display.change(chat_manager.load_chat, inputs=[mistral_saved_chat_display, mistral_saved_chats, mistral_state], outputs=[mistral_chatbot, mistral_state, mistral_saved_chat_display])
+
+                mistral_delete_chat_button.click(chat_manager.delete_chat, inputs=[mistral_saved_chat_display, mistral_saved_chats], outputs=[mistral_saved_chats])
+                mistral_delete_all_chats_button.click(chat_manager.delete_all_chats, outputs=[mistral_saved_chats])
+                demo.load(update_mistral_radio, inputs=[mistral_saved_chats], outputs=[mistral_saved_chat_display])
+
+                mistral_analyze_btn_analysis.click(
+                    lambda image, chat_history, user_input: mistral_functions.analyze_image_mistral(image, chat_history, user_input, "Was ist auf diesem Bild? Bitte in Deutsch antworten."),
+                    inputs=[mistral_image_upload_analysis, mistral_state, mistral_user_input],
+                    outputs=[mistral_chatbot]
+                )
+                mistral_analyze_btn_charts.click(
+                    lambda image, chat_history, user_input: mistral_functions.analyze_image_mistral(image, chat_history, user_input, "Was ist auf diesem Bild? Bitte in Deutsch antworten."),
+                    inputs=[mistral_image_upload_analysis, mistral_state, mistral_user_input],
+                    outputs=[mistral_chatbot]
+                )
+                mistral_analyze_btn_compare.click(
+                    lambda image, chat_history, user_input: mistral_functions.analyze_image_mistral(image, chat_history, user_input, "Was sind die Unterschiede zwischen den beiden Bildern? Bitte in Deutsch antworten."),
+                    inputs=[mistral_image_upload_analysis, mistral_state, mistral_user_input],
+                    outputs=[mistral_chatbot]
+                )
+                mistral_analyze_btn_receipts.click(
+                    lambda image, chat_history, user_input: mistral_functions.analyze_image_mistral(image, chat_history, user_input, "Transkribieren Sie diesen Beleg. Bitte in Deutsch antworten."),
+                    inputs=[mistral_image_upload_analysis, mistral_state, mistral_user_input],
+                    outputs=[mistral_chatbot]
+                )
+                mistral_analyze_btn_documents.click(
+                    lambda image, chat_history, user_input: mistral_functions.analyze_image_mistral(image, chat_history, user_input, "Transkribieren Sie dieses Dokument. Bitte in Deutsch antworten."),
+                    inputs=[mistral_image_upload_analysis, mistral_state, mistral_user_input],
+                    outputs=[mistral_chatbot]
+                )
+                mistral_analyze_btn_ocr.click(
+                    lambda image, chat_history, user_input: mistral_functions.analyze_image_mistral(image, chat_history, user_input, "Extrahieren Sie aus dieser Rechnung die Rechnungsnummer, die Artikelnamen und zugehörigen Preise sowie den Gesamtpreis und geben Sie sie als Zeichenfolge in einem JSON-Objekt zurück. Bitte in Deutsch antworten."),
+                    inputs=[mistral_image_upload_analysis, mistral_state, mistral_user_input],
+                    outputs=[mistral_chatbot]
+                )
+
+                mistral_compare_btn.click(mistral_functions.compare_images_mistral, inputs=[mistral_image_upload_compare1, mistral_image_upload_compare2, mistral_state], outputs=[mistral_chatbot])
+
+            # --- Gemini Chatbot ---
+            with gr.TabItem("Gemini Chatbot"):
+                gemini_chatbot = gr.Chatbot(label="Chat-Verlauf", height=400)
+                gemini_state = gr.State([])
+                gemini_saved_chats = gr.State(chat_manager._load_chats_from_file())
+
+                with gr.Row():
+                    with gr.Column(scale=5):
+                        gemini_user_input = gr.Textbox(label="Nachricht", placeholder="Geben Sie hier Ihre Nachricht ein...")
+                    with gr.Column(scale=1, min_width=100):
+                        gemini_submit_btn = gr.Button("Senden")
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        gemini_image_upload = gr.Image(type="pil", label="Bild hochladen", height=200)
+                    with gr.Column(scale=1):
+                        gemini_audio_upload = gr.Audio(type="filepath", label="Audio hochladen")
+                    with gr.Column(scale=1):
+                        gemini_analyze_btn = gr.Button("Bild mit Nachricht senden")
+
+                with gr.Row():
+                    gemini_clear_chat_button = gr.Button("Chat leeren")
+                    gemini_save_chat_button = gr.Button("Chat speichern")
+                    gemini_new_chat_button = gr.Button("Neuen Chat starten")
+
+                with gr.Accordion("Gespeicherte Chats", open=False):
+                    gemini_saved_chat_display = gr.Radio(label="Gespeicherte Chats", interactive=True)
+                    with gr.Row():
+                        gemini_delete_chat_button = gr.Button("Ausgewählten Chat löschen")
+                        gemini_delete_all_chats_button = gr.Button("Alle Chats löschen")
+
+                gemini_submit_btn.click(
+                    gemini_functions.chat_with_gemini,
+                    inputs=[gemini_user_input, gemini_state, gemini_image_upload, gemini_audio_upload],
+                    outputs=[gemini_chatbot, gemini_user_input]
+                )
+
+                gemini_analyze_btn.click(
+                    lambda image, chat_history, user_input: gemini_functions.analyze_image_gemini(image, chat_history, user_input),
+                    inputs=[gemini_image_upload, gemini_state, gemini_user_input],
+                    outputs=[gemini_chatbot]
+                )
+                gemini_clear_chat_button.click(chat_manager.clear_chat, inputs=[gemini_state], outputs=[gemini_chatbot])
+                gemini_save_chat_button.click(chat_manager.save_chat, inputs=[gemini_state, gemini_saved_chats], outputs=[gemini_saved_chats])
+                gemini_new_chat_button.click(chat_manager.new_chat, inputs=[gemini_saved_chats], outputs=[gemini_chatbot, gemini_saved_chats])
+
+                def update_gemini_radio(chats):
+                    formatted_chats = [chat_manager.format_saved_chat(chat) for chat in chats]
+                    return gr.update(choices=formatted_chats)
+
+                gemini_saved_chats.change(update_gemini_radio, inputs=[gemini_saved_chats], outputs=[gemini_saved_chat_display])
+                gemini_saved_chat_display.change(chat_manager.load_chat, inputs=[gemini_saved_chat_display, gemini_saved_chats, gemini_state], outputs=[gemini_chatbot, gemini_state, gemini_saved_chat_display])
+
+                gemini_delete_chat_button.click(chat_manager.delete_chat, inputs=[gemini_saved_chat_display, gemini_saved_chats], outputs=[gemini_saved_chats])
+                gemini_delete_all_chats_button.click(chat_manager.delete_all_chats, outputs=[gemini_saved_chats])
+                demo.load(update_gemini_radio, inputs=[gemini_saved_chats], outputs=[gemini_saved_chat_display])
+
+            # --- Ollama Chatbot ---
+            with gr.TabItem("Ollama Chatbot"):
+                ollama_input_text = gr.Textbox(lines=2, placeholder="Geben Sie Ihre Frage an Ollama ein", label="Eingabe (oder Datei hochladen)")
+                ollama_model_selector = gr.Dropdown(choices=OLLAMA_MODELS, value=DEFAULT_OLLAMA_MODEL, label="Modell auswählen")
+                ollama_file_upload1 = gr.File(label="Datei 1 hochladen (PDF oder TXT)", file_types=[".txt", ".pdf"])
+                ollama_file_upload2 = gr.File(label="Datei 2 hochladen (PDF oder TXT)", file_types=[".txt", ".pdf"])
+                ollama_audio_upload = gr.Audio(type="filepath", label="Audio hochladen")
+                ollama_output = gr.Markdown(label="Antwort")
+                ollama_status = gr.Label(label="Status")
+
+                ollama_submit_btn = gr.Button("Senden")
+                ollama_submit_btn.click(ollama_functions.chatbot_interface, inputs=[ollama_input_text, ollama_model_selector, ollama_file_upload1, ollama_file_upload2, ollama_audio_upload], outputs=[ollama_output, ollama_status])
+
+            # --- Dateierstellung ---
+            with gr.TabItem("Dateierstellung"):
+                gr.Markdown("## Dateierstellung")
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        file_type = gr.Radio(choices=["Excel", "Word", "PDF", "PowerPoint", "CSV"], label="Dateiformat", value="Excel")
+                    with gr.Column(scale=1):
+                        sheets = gr.Slider(minimum=1, maximum=5, step=1, label="Anzahl der Tabellenblätter (nur Excel)", value=1)
+                    with gr.Column(scale=2):
+                        file_content = gr.Textbox(label="Inhalt der Datei", placeholder="Geben Sie den Inhalt der Datei ein...")
+                    with gr.Column(scale=1):
+                        create_file_btn = gr.Button("Datei erstellen")
+                        download_file = gr.File(label="Herunterladen")
+
+                create_file_btn.click(
+                    lambda content, file_format, sheets: (
+                        file_creator.create_excel_with_ai(content, sheets) if file_format == "Excel" else
+                        file_creator.create_word_with_ai(content) if file_format == "Word" else
+                        file_creator.create_pdf_with_ai(content) if file_format == "PDF" else
+                        file_creator.create_ppt_with_ai(content) if file_format == "PowerPoint" else
+                        file_creator.create_csv_with_ai(content)
+                    ),
+                    inputs=[file_content, file_type, sheets],
+                    outputs=[download_file]
+                )
+
+            # --- Code Editor ---
+            with gr.TabItem("Code Editor"):
+                gr.Markdown("""
+                <h1>Code Analyzer & Generator mit Gemini AI</h1>
+                """, elem_classes="markdown-text")
+
+                # Input Code Editor
+                code_input = gr.Code(label="Code Eingabe", language="python", lines=10, elem_classes="code-output")
+
+                # Buttons
+                with gr.Row():
+                    analyze_button = gr.Button("Code analysieren", variant="primary", elem_classes="button-font")
+                    suggest_button = gr.Button("Vorschläge generieren", variant="secondary", elem_classes="button-font")
+
+                # Outputs
+                analysis_output = gr.Code(label="Analyse", language="python", lines=10, elem_classes="code-output")
+                suggestions_output = gr.Code(label="Vorschläge", language="python", lines=10, elem_classes="code-output")
+
+                # Button Click Events
+                analyze_button.click(fn=gemini_functions.analyze_code, inputs=code_input, outputs=analysis_output)
+                suggest_button.click(fn=gemini_functions.suggest_code_improvements, inputs=code_input, outputs=suggestions_output)
+
+                # Save and Load Code
+                save_button = gr.Button("Code speichern", variant="primary", elem_classes="button-font")
+                load_button = gr.Button("Code laden", variant="secondary", elem_classes="button-font")
+                filename_input = gr.Textbox(label="Dateiname", placeholder="Geben Sie den Dateinamen ein", elem_classes="code-output")
+
+                save_button.click(fn=gemini_functions.save_code, inputs=[code_input, filename_input])
+                load_button.click(fn=gemini_functions.load_code, inputs=filename_input, outputs=code_input)
+
+                # Model Selection
+                model_selection = gr.Dropdown(choices=["gemini-pro", "gemini-lite"], label="Gemini Modell", value="gemini-pro", elem_classes="code-output")
+                model_selection.change(fn=gemini_functions.update_model, inputs=model_selection)
+
+                # Format Code with Black
+                format_button = gr.Button("Code mit black formatieren", variant="secondary", elem_classes="button-font")
+                format_button.click(fn=gemini_functions.format_code_with_black, inputs=code_input, outputs=code_input)
+
+    return demo
+
+if __name__ == '__main__':
+    demo = create_gradio_interface()
+    demo.launch(share=True, server_name="localhost", server_port=3379)
+
+
+# Inhalt der Datei: helpers.py
+################################################################################
+from PIL import Image
+import base64
+from io import BytesIO
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+def encode_image(image: Image.Image) -> str:
+    """
+    Kodiert ein Bild in Base64.
+
+    Args:
+        image (Image.Image): Das zu kodierende Bild.
+
+    Returns:
+        str: Das Base64-kodierte Bild.
+
+    Raises:
+        Exception: Wenn die Kodierung des Bildes fehlschlägt.
+    """
+    try:
+        buffered = BytesIO()
+        image.save(buffered, format="JPEG")
+        return base64.b64encode(buffered.getvalue()).decode('utf-8')
+    except Exception as e:
+        logger.error(f"Fehler beim Kodieren des Bildes: {e}")
+        raise
+
+def format_chat_message(text: str) -> str:
+    """
+    Formatiert eine Chatnachricht mit benutzerdefiniertem Stil.
+
+    Args:
+        text (str): Der Text der Chatnachricht.
+
+    Returns:
+        str: Die formatierte Chatnachricht.
+    """
+    return f"<div style='background-color:#333333; padding: 10px; margin-bottom: 5px; border-radius: 5px;'>{text}</div>"
+
+
+# Inhalt der Datei: logging_config.py
+################################################################################
+import sys
+from loguru import logger
+
+def setup_logging(log_level: str = "DEBUG") -> None:
+    """
+    Konfiguriert das Logging für die Anwendung.
+
+    Args:
+        log_level (str): Das Logging-Level.
+    """
+    logger.remove()  # Entferne den Standard-Logger
+    logger.add(sys.stderr, level=log_level, format="{time} - {name} - {level} - {message} - {function} - {line}")
+
+
+# Inhalt der Datei: mistral_functions.py
+################################################################################
+import requests
+import json
+from typing import List, Tuple, Generator, Optional
+from PIL import Image
+from helpers import encode_image, format_chat_message
+from api_client import api_client
+from config import MISTRAL_CHAT_MODEL, MISTRAL_IMAGE_MODEL, MISTRAL_API_URL, mistral_api_key
+from audio_processing import process_audio
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+class MistralFunctions:
+    """
+    Klasse zur Verwaltung der Mistral-Funktionalitäten.
+
+    Diese Klasse bietet Methoden zur Analyse und Verbesserung von Python-Code mithilfe des Mistral-Modells.
+    """
+
+    def __init__(self):
+        """
+        Initialisiert die MistralFunctions.
+        """
+        pass
+
+    def chat_with_mistral(self, user_input: str, chat_history: List[Tuple[str, str]], image: Optional[Image.Image] = None, audio_file: Optional[str] = None) -> Generator[Tuple[List[Tuple[str, str]], str], None, None]:
+        """
+        Chattet mit dem Mistral-Modell.
+
+        Args:
+            user_input (str): Die Benutzereingabe.
+            chat_history (List[Tuple[str, str]]): Der Chatverlauf.
+            image (Optional[Image.Image]): Das hochzuladende Bild.
+            audio_file (Optional[str]): Der Pfad zur Audiodatei.
+
+        Yields:
+            Tuple[List[Tuple[str, str]], str]: Der aktualisierte Chatverlauf und die Antwort.
+        """
+        if not user_input.strip() and not audio_file:
+            yield chat_history, "Bitte geben Sie eine Nachricht ein oder laden Sie eine Audiodatei hoch."
+            return
+
+        if audio_file:
+            try:
+                user_input = process_audio(audio_file)
+            except Exception as e:
+                chat_history.append((None, f"Fehler bei der Verarbeitung der Audiodatei: {e}"))
+                yield chat_history, ""
+                return
+
+        chat_history.append((user_input, None))
+        yield chat_history, ""
+
+        messages = [{"role": "user", "content": user_input}]
+
+        if image:
+            try:
+                image_base64 = encode_image(image)
+                messages[0]["content"] = [
+                    {"type": "text", "text": user_input},
+                    {"type": "image_url", "image_url": f"data:image/jpeg;base64,{image_base64}"},
+                ]
+            except Exception as e:
+                chat_history.append((None, f"Fehler beim Hochladen des Bildes: {e}"))
+                yield chat_history, ""
+                return
+
+        try:
+            headers = {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Authorization": f"Bearer {mistral_api_key}",
+            }
+
+            payload = {
+                "model": MISTRAL_CHAT_MODEL,
+                "messages": messages,
+                "temperature": 1,
+                "top_p": 0.95,
+                "max_tokens": 160192,
+                "stream": True
+            }
+
+            response = requests.post(MISTRAL_API_URL, headers=headers, json=payload, stream=True)
+            response.raise_for_status()
+            full_response = ""
+
+            for chunk in response.iter_lines():
+                if chunk:
+                    try:
+                        if chunk == b"data: [DONE]":
+                            break
+
+                        if chunk.strip():
+                            chunk_data = json.loads(chunk.decode('utf-8').replace('data: ', ''))
+                            if 'choices' in chunk_data and chunk_data['choices']:
+                                delta_content = chunk_data['choices'][0]['delta'].get('content', '')
+                                if delta_content:
+                                    full_response += delta_content
+                                    formatted_response = format_chat_message(full_response)
+                                    chat_history[-1] = (user_input, formatted_response)
+                                    yield chat_history, ""
+                    except json.JSONDecodeError as e:
+                        logger.error(f"JSON Decode Fehler: {e} - Ungültiger Chunk: {chunk}")
+                        continue
+
+            if full_response:
+                chat_history[-1] = (user_input, format_chat_message(full_response))
+                yield chat_history, ""
+            else:
+                chat_history.append((None, "Keine Antwort vom Modell erhalten."))
+                yield chat_history, ""
+        except requests.exceptions.RequestException as e:
+            chat_history.append((None, f"Fehler bei der Verarbeitung der Anfrage: {e}"))
+            yield chat_history, ""
+        except Exception as e:
+            chat_history.append((None, f"Unbekannter Fehler: {e}. Bitte versuchen Sie es nochmal."))
+            yield chat_history, ""
+
+    def analyze_image_mistral(self, image: Optional[Image.Image], chat_history: List[Tuple[str, str]], user_input: str, prompt: str) -> List[Tuple[str, str]]:
+        """
+        Analysiert ein Bild mit Mistral.
+
+        Args:
+            image (Optional[Image.Image]): Das zu analysierende Bild.
+            chat_history (List[Tuple[str, str]]): Der Chatverlauf.
+            user_input (str): Die Benutzereingabe.
+            prompt (str): Der Prompt für die Bildanalyse.
+
+        Returns:
+            List[Tuple[str, str]]: Der aktualisierte Chatverlauf.
+        """
+        if image is None:
+            chat_history.append((None, "Bitte laden Sie ein Bild hoch."))
+            return chat_history
+
+        try:
+            image_base64 = encode_image(image)
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": f"{user_input} {prompt}"},
+                        {"type": "image_url", "image_url": f"data:image/jpeg;base64,{image_base64}"},
+                    ],
+                }
+            ]
+
+            chat_response = api_client.mistral_client.chat.complete(
+                model=MISTRAL_IMAGE_MODEL,
+                messages=messages
+            )
+
+            response_text = chat_response.choices[0].message.content
+            chat_history.append((None, format_chat_message(response_text)))
+        except Exception as e:
+            chat_history.append((None, f"Unbekannter Fehler bei der Bildanalyse: {e}. Bitte versuchen Sie es nochmal."))
+
+        return chat_history
+
+    def compare_images_mistral(self, image1: Optional[Image.Image], image2: Optional[Image.Image], chat_history: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
+        """
+        Vergleicht zwei Bilder mit Mistral.
+
+        Args:
+            image1 (Optional[Image.Image]): Das erste zu vergleichende Bild.
+            image2 (Optional[Image.Image]): Das zweite zu vergleichende Bild.
+            chat_history (List[Tuple[str, str]]): Der Chatverlauf.
+
+        Returns:
+            List[Tuple[str, str]]: Der aktualisierte Chatverlauf.
+        """
+        if image1 is None or image2 is None:
+            chat_history.append((None, "Bitte laden Sie zwei Bilder hoch."))
+            return chat_history
+
+        try:
+            image1_base64 = encode_image(image1)
+            image2_base64 = encode_image(image2)
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Was sind die Unterschiede zwischen den beiden Bildern? Bitte in Deutsch antworten."},
+                        {"type": "image_url", "image_url": f"data:image/jpeg;base64,{image1_base64}"},
+                        {"type": "image_url", "image_url": f"data:image/jpeg;base64,{image2_base64}"},
+                    ],
+                }
+            ]
+
+            chat_response = api_client.mistral_client.chat.complete(
+                model=MISTRAL_IMAGE_MODEL,
+                messages=messages
+            )
+
+            response_text = chat_response.choices[0].message.content
+            chat_history.append((None, format_chat_message(response_text)))
+        except Exception as e:
+            chat_history.append((None, f"Unbekannter Fehler beim Vergleich der Bilder: {e}. Bitte versuchen Sie es nochmal."))
+
+        return chat_history
+
+mistral_functions = MistralFunctions()
+
+
+# Inhalt der Datei: model_pipeline.py
+################################################################################
+from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
+from config import device, torch_dtype, model_id
+import torch
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+class ModelPipeline:
+    """
+    Klasse zur Verwaltung der Modell-Pipeline.
+
+    Diese Klasse initialisiert die Modell-Pipeline für die Spracherkennung.
+
+    Attributes:
+        model (AutoModelForSpeechSeq2Seq): Das Modell für die Spracherkennung.
+        processor (AutoProcessor): Der Prozessor für die Spracherkennung.
+        pipe (pipeline): Die Pipeline für die Spracherkennung.
+    """
+
+    def __init__(self, model_id: str, device: str, torch_dtype: torch.dtype):
+        """
+        Initialisiert die Modell-Pipeline.
+
+        Args:
+            model_id (str): Die ID des Modells.
+            device (str): Das Gerät (CPU oder GPU).
+            torch_dtype (torch.dtype): Der Datentyp für die Berechnungen.
+
+        Raises:
+            Exception: Wenn die Initialisierung der Modell-Pipeline fehlschlägt.
+        """
+        try:
+            self.model = AutoModelForSpeechSeq2Seq.from_pretrained(
+                model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True
+            )
+            self.model.to(device)
+            self.processor = AutoProcessor.from_pretrained(model_id)
+            self.pipe = pipeline(
+                "automatic-speech-recognition",
+                model=self.model,
+                tokenizer=self.processor.tokenizer,
+                feature_extractor=self.processor.feature_extractor,
+                torch_dtype=torch_dtype,
+                device=device,
+            )
+        except Exception as e:
+            logger.error(f"Fehler beim Initialisieren der Modell-Pipeline: {e}")
+            raise
+
+model_pipeline = ModelPipeline(model_id, device, torch_dtype)
+
+
+# Inhalt der Datei: ollama_functions.py
+################################################################################
+import subprocess
+import re
+from typing import Generator, Optional, Tuple
+import gradio as gr
+from PyPDF2 import PdfReader
+from helpers import format_chat_message
+from config import OLLAMA_MODELS, DEFAULT_OLLAMA_MODEL, STATUS_MESSAGE_GENERATING, STATUS_MESSAGE_COMPLETE, STATUS_MESSAGE_ERROR
+from audio_processing import process_audio
+import difflib
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+class OllamaFunctions:
+    """
+    Klasse zur Verwaltung der Ollama-Funktionalitäten.
+
+    Diese Klasse bietet Methoden zur Analyse und Verbesserung von Python-Code mithilfe des Ollama-Modells.
+    """
+
+    def __init__(self):
+        """
+        Initialisiert die OllamaFunctions.
+        """
+        pass
+
+    def clean_output(self, output: str) -> str:
+        """
+        Entfernt Steuerzeichen aus der Ollama-Ausgabe.
+
+        Args:
+            output (str): Die Ausgabe von Ollama.
+
+        Returns:
+            str: Die bereinigte Ausgabe.
+        """
+        cleaned_output = re.sub(r'(?:\x1B[@-_]|[\x1B\x9B][0-?]*[ -/]*[@-~])', '', output)
+        cleaned_output = re.sub(r'\?\d+[lh]', '', cleaned_output)
+        cleaned_output = re.sub(r'[\u2800-\u28FF]', '', cleaned_output)
+        cleaned_output = re.sub(r'\r', '', cleaned_output)
+        cleaned_output = re.sub(r'2K1G ?(?:2K1G)*!?', '', cleaned_output)
+        return cleaned_output
+
+    def format_as_codeblock(self, output: str) -> str:
+        """
+        Formatiert die Ausgabe als Markdown-Codeblock.
+
+        Args:
+            output (str): Die Ausgabe.
+
+        Returns:
+            str: Die formatierte Ausgabe als Codeblock.
+        """
+        return f"```\n{output}\n```"
+
+    def format_output(self, output: str) -> str:
+        """
+        Formatiert die Ausgabe mit Zeilenumbrüchen und Code-Blöcken.
+
+        Args:
+            output (str): Die Ausgabe.
+
+        Returns:
+            str: Die formatierte Ausgabe.
+        """
+        output = re.sub(r'\s+', ' ', output)
+        output = re.sub(r'(.{80,}?)(\s+|$)', r'\1\n', output)
+        code_blocks = re.findall(r'```(.*?)```', output, re.DOTALL)
+        for block in code_blocks:
+            formatted_block = self.format_as_codeblock(block.strip())
+            output = output.replace(f'```{block}```', formatted_block)
+        return output
+
+    def run_ollama_live(self, prompt: str, model: str) -> Generator[str, None, None]:
+        """
+        Führt Ollama aus und gibt die Ausgabe live zurück.
+
+        Args:
+            prompt (str): Der Prompt für die Ausführung.
+            model (str): Das ausgewählte Modell.
+
+        Yields:
+            str: Die Ausgabe von Ollama.
+        """
+        try:
+            process = subprocess.Popen(
+                ["ollama", "run", model],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                encoding='utf-8',
+            )
+            process.stdin.write(prompt + "\n")
+            process.stdin.close()
+
+            buffer = ""
+            for line in iter(process.stdout.readline, ''):
+                clean_line = self.clean_output(line)
+                if clean_line:
+                    buffer += clean_line + "\n"
+                    yield self.format_output(buffer)
+
+            process.stdout.close()
+            process.wait()
+
+        except Exception as e:
+            logger.error(f"Fehler beim Ausführen von Ollama: {e}")
+            yield f"**Fehler:** {str(e)}"
+
+    def process_uploaded_file(self, file: gr.File) -> str:
+        """
+        Verarbeitet hochgeladene TXT- und PDF-Dateien.
+
+        Args:
+            file (gr.File): Die hochgeladene Datei.
+
+        Returns:
+            str: Der Inhalt der Datei.
+
+        Raises:
+            ValueError: Wenn das Lesen der Datei fehlschlägt.
+        """
+        if file.name.endswith(".txt"):
+            with open(file.name, 'r', encoding='utf-8') as f:
+                return f.read()
+        elif file.name.endswith(".pdf"):
+            try:
+                reader = PdfReader(file.name)
+                content = ""
+                for page in reader.pages:
+                    content += page.extract_text()
+                return content
+            except Exception as e:
+                logger.error(f"Fehler beim Lesen der PDF-Datei: {e}")
+                raise ValueError(f"Fehler beim Lesen der PDF-Datei: {e}")
+        else:
+            raise ValueError("Nur TXT- und PDF-Dateien werden unterstützt.")
+
+    def compare_documents(self, file1: gr.File, file2: gr.File) -> str:
+        """
+        Vergleicht zwei hochgeladene Dokumente und gibt die Unterschiede zurück.
+
+        Args:
+            file1 (gr.File): Die erste hochgeladene Datei.
+            file2 (gr.File): Die zweite hochgeladene Datei.
+
+        Returns:
+            str: Die Unterschiede zwischen den beiden Dokumenten.
+
+        Raises:
+            ValueError: Wenn das Vergleichen der Dokumente fehlschlägt.
+        """
+        try:
+            content1 = self.process_uploaded_file(file1)
+            content2 = self.process_uploaded_file(file2)
+
+            diff = difflib.unified_diff(
+                content1.splitlines(),
+                content2.splitlines(),
+                fromfile='File1',
+                tofile='File2',
+                lineterm=''
+            )
+
+            diff_output = '\n'.join(diff)
+            return self.format_as_codeblock(diff_output)
+
+        except ValueError as e:
+            logger.error(f"Fehler beim Vergleichen der Dokumente: {e}")
+            return f"**Fehler:** {str(e)}"
+        except Exception as e:
+            logger.error(f"Unerwarteter Fehler beim Vergleichen der Dokumente: {e}")
+            return f"**Unerwarteter Fehler:** {str(e)}"
+
+    def chatbot_interface(self, input_text: str, model: str, file1: Optional[gr.File] = None, file2: Optional[gr.File] = None, audio_file: Optional[gr.File] = None) -> Generator[Tuple[str, str], None, None]:
+        """
+        Schnittstelle für die Ollama-Chatbot-Funktion.
+
+        Args:
+            input_text (str): Der Eingabetext.
+            model (str): Das ausgewählte Modell.
+            file1 (Optional[gr.File]): Die erste hochgeladene Datei.
+            file2 (Optional[gr.File]): Die zweite hochgeladene Datei.
+            audio_file (Optional[gr.File]): Die hochgeladene Audiodatei.
+
+        Yields:
+            Tuple[str, str]: Die Ausgabe und der Status.
+        """
+        yield "", STATUS_MESSAGE_GENERATING
+
+        if file1 and file2:
+            try:
+                content1 = self.process_uploaded_file(file1)
+                content2 = self.process_uploaded_file(file2)
+                combined_input = f"{input_text}\n\nVergleichen Sie die folgenden beiden Dokumente und antworten Sie immer auf Deutsch:\n\nDokument 1:\n{content1}\n\nDokument 2:\n{content2}"
+            except ValueError as e:
+                yield f"**Fehler:** {str(e)}", STATUS_MESSAGE_ERROR
+                return
+            except Exception as e:
+                yield f"**Unerwarteter Fehler:** {str(e)}", STATUS_MESSAGE_ERROR
+                return
+
+        elif file1 or file2:
+            try:
+                content = self.process_uploaded_file(file1 or file2)
+                combined_input = f"{input_text}\n\nInhalt des Dokuments:\n{content}"
+            except ValueError as e:
+                yield f"**Fehler:** {str(e)}", STATUS_MESSAGE_ERROR
+                return
+            except Exception as e:
+                yield f"**Unerwarteter Fehler:** {str(e)}", STATUS_MESSAGE_ERROR
+                return
+
+        elif audio_file:
+            try:
+                audio_content = process_audio(audio_file)
+                combined_input = f"{input_text}\n\nInhalt der Audiodatei:\n{audio_content}"
+            except Exception as e:
+                yield f"**Fehler bei der Verarbeitung der Audiodatei:** {str(e)}", STATUS_MESSAGE_ERROR
+                return
+
+        else:
+            combined_input = input_text
+
+        try:
+            for chunk in self.run_ollama_live(combined_input, model):
+                yield chunk, STATUS_MESSAGE_GENERATING
+            yield chunk, STATUS_MESSAGE_COMPLETE
+        except Exception as e:
+            yield f"**Fehler bei der Kommunikation mit Ollama:** {str(e)}", STATUS_MESSAGE_ERROR
+
+ollama_functions = OllamaFunctions()
+
+
+# Inhalt der Datei: ordnerlist.py
+################################################################################
+import os
+
+def combine_python_files_to_text(output_file="combined_python_files.txt"):
+    """
+    Liest alle .py-Dateien im aktuellen Verzeichnis und schreibt deren Inhalte in eine einzige Textdatei.
+    
+    Args:
+        output_file (str): Der Name der Datei, in die die Inhalte geschrieben werden sollen.
+    """
+    current_directory = os.getcwd()
+    python_files = [f for f in os.listdir(current_directory) if f.endswith(".py")]
+
+    with open(output_file, "w", encoding="utf-8") as outfile:
+        for file in python_files:
+            outfile.write(f"# Inhalt der Datei: {file}\n")
+            outfile.write("#" * 80 + "\n")
+            try:
+                with open(file, "r", encoding="utf-8") as infile:
+                    outfile.write(infile.read())
+            except Exception as e:
+                outfile.write(f"# Fehler beim Lesen der Datei {file}: {e}\n")
+            outfile.write("\n\n")
+
+    print(f"Alle Inhalte wurden erfolgreich in {output_file} geschrieben.")
+
+# Funktion aufrufen
+combine_python_files_to_text()
+
+
+# Inhalt der Datei: test_audio_processing.py
+################################################################################
+import unittest
+from audio_processing import process_audio
+
+class TestAudioProcessing(unittest.TestCase):
+    def test_process_audio(self):
+        # Test mit einer gültigen Audiodatei
+        result = process_audio("path/to/valid/audio/file.wav")
+        self.assertIsNotNone(result)
+        self.assertIn("transcribed text", result)
+
+        # Test mit einer ungültigen Audiodatei
+        with self.assertRaises(ValueError):
+            process_audio("path/to/invalid/audio/file.mp3")
+
+if __name__ == "__main__":
+    unittest.main()
+
+# Inhalt der Datei: test_chat_manager.py
+################################################################################
+import unittest
+from chat_manager import ChatManager, SAVE_DIR, SAVE_FILE
+import os
+
+class TestChatManager(unittest.TestCase):
+    def setUp(self):
+        self.chat_manager = ChatManager(SAVE_DIR, SAVE_FILE)
+
+    def test_clear_chat(self):
+        chat_history = [("message1", "response1"), ("message2", "response2")]
+        cleared_chat = self.chat_manager.clear_chat(chat_history)
+        self.assertEqual(cleared_chat, [])
+
+    def test_generate_chat_title(self):
+        chat_history = [("message1", "response1"), ("message2", "response2")]
+        title = self.chat_manager.generate_chat_title(chat_history)
+        self.assertIn("message1", title)
+
+    def test_save_chat(self):
+        chat_history = [("message1", "response1"), ("message2", "response2")]
+        saved_chats = []
+        self.chat_manager.save_chat(chat_history, saved_chats)
+        self.assertEqual(len(saved_chats), 1)
+        self.assertIn("message1", saved_chats[0]["chat"])
+
+    def test_load_chat(self):
+        chat_history = [("message1", "response1"), ("message2", "response2")]
+        saved_chats = []
+        self.chat_manager.save_chat(chat_history, saved_chats)
+        loaded_chat = self.chat_manager.load_chat("Neuer Chat", saved_chats, [])
+        self.assertEqual(loaded_chat[0], chat_history)
+
+    def test_new_chat(self):
+        saved_chats = [{"title": "Chat 1", "chat": [("message1", "response1")]}]
+        new_chat = self.chat_manager.new_chat(saved_chats)
+        self.assertEqual(new_chat[0], [])
+        self.assertEqual(len(new_chat[1]), 1)
+
+    def test_delete_chat(self):
+        saved_chats = [{"title": "Chat 1", "chat": [("message1", "response1")]}]
+        self.chat_manager.delete_chat("Chat 1", saved_chats)
+        self.assertEqual(len(saved_chats), 0)
+
+    def test_delete_all_chats(self):
+        saved_chats = [{"title": "Chat 1", "chat": [("message1", "response1")]}]
+        self.chat_manager.delete_all_chats()
+        self.assertEqual(len(self.chat_manager._load_chats_from_file()), 0)
+
+    def tearDown(self):
+        if os.path.exists(SAVE_FILE):
+            os.remove(SAVE_FILE)
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+# Inhalt der Datei: test_gemini_functions.py
+################################################################################
+import unittest
+from unittest.mock import MagicMock
+from gemini_functions import GeminiFunctions, encode_image, format_chat_message
+from api_client import api_client
+
+class TestGeminiFunctions(unittest.TestCase):
+    def setUp(self):
+        self.gemini_functions = GeminiFunctions()
+        api_client.gemini_model = MagicMock()
+
+    def test_upload_to_gemini(self):
+        image = MagicMock()
+        image.save = MagicMock()
+        result = self.gemini_functions.upload_to_gemini(image)
+        self.assertIsNotNone(result)
+
+    def test_chat_with_gemini(self):
+        user_input = "Hello"
+        chat_history = []
+        api_client.gemini_model.start_chat = MagicMock(return_value=MagicMock())
+        api_client.gemini_model.start_chat().send_message = MagicMock(return_value=MagicMock(text="Hi"))
+
+        result = list(self.gemini_functions.chat_with_gemini(user_input, chat_history))
+        self.assertEqual(result[0][0][1], "Hi")
+
+    def test_analyze_image_gemini(self):
+        image = MagicMock()
+        user_input = "Describe this image"
+        chat_history = []
+        api_client.gemini_model.generate_content = MagicMock(return_value=[MagicMock(text="Image description")])
+
+        result = self.gemini_functions.analyze_image_gemini(image, chat_history, user_input)
+        self.assertIn("Image description", result[-1][1])
+
+    def test_format_code(self):
+        code_input = "print('Hello, world!')"
+        result = self.gemini_functions.format_code(code_input)
+        self.assertIn("<pre>", result)
+
+    def test_save_code(self):
+        code_input = "print('Hello, world!')"
+        filename = "test_code.py"
+        self.gemini_functions.save_code(code_input, filename)
+        with open(filename, 'r') as file:
+            content = file.read()
+        self.assertIn("print('Hello, world!')", content)
+        os.remove(filename)
+
+    def test_load_code(self):
+        filename = "test_code.py"
+        with open(filename, 'w') as file:
+            file.write("print('Hello, world!')")
+        result = self.gemini_functions.load_code(filename)
+        self.assertIn("print('Hello, world!')", result)
+        os.remove(filename)
+
+    def test_format_code_with_black(self):
+        code_input = "print('Hello, world!')"
+        result = self.gemini_functions.format_code_with_black(code_input)
+        self.assertIn("print('Hello, world!')", result)
+
+    def test_analyze_code(self):
+        code_input = "print('Hello, world!')"
+        api_client.gemini_model.generate_content = MagicMock(return_value=MagicMock(text="Code analysis"))
+        result = self.gemini_functions.analyze_code(code_input)
+        self.assertIn("Code analysis", result)
+
+    def test_suggest_code_improvements(self):
+        code_input = "print('Hello, world!')"
+        api_client.gemini_model.generate_content = MagicMock(return_value=MagicMock(text="Code improvements"))
+        result = self.gemini_functions.suggest_code_improvements(code_input)
+        self.assertIn("Code improvements", result)
+
+    def test_update_model(self):
+        model_name = "gemini-pro"
+        self.gemini_functions.update_model(model_name)
+        self.assertEqual(api_client.gemini_model.model_name, model_name)
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+# Inhalt der Datei: test_mistral_functions.py
+################################################################################
+
+import unittest
+from unittest.mock import MagicMock
+from mistral_functions import MistralFunctions, encode_image, format_chat_message
+from api_client import api_client
+
+class TestMistralFunctions(unittest.TestCase):
+    def setUp(self):
+        self.mistral_functions = MistralFunctions()
+        api_client.mistral_client = MagicMock()
+
+    def test_chat_with_mistral(self):
+        user_input = "Hello"
+        chat_history = []
+        api_client.mistral_client.chat.complete = MagicMock(return_value=MagicMock(choices=[MagicMock(message=MagicMock(content="Hi"))]))
+
+        result = list(self.mistral_functions.chat_with_mistral(user_input, chat_history))
+        self.assertEqual(result[0][0][1], "Hi")
+
+    def test_analyze_image_mistral(self):
+        image = MagicMock()
+        user_input = "Describe this image"
+        chat_history = []
+        api_client.mistral_client.chat.complete = MagicMock(return_value=MagicMock(choices=[MagicMock(message=MagicMock(content="Image description"))]))
+
+        result = self.mistral_functions.analyze_image_mistral(image, chat_history, user_input, "Describe this image")
+        self.assertIn("Image description", result[-1][1])
+
+    def test_compare_images_mistral(self):
+        image1 = MagicMock()
+        image2 = MagicMock()
+        chat_history = []
+        api_client.mistral_client.chat.complete = MagicMock(return_value=MagicMock(choices=[MagicMock(message=MagicMock(content="Image comparison"))]))
+
+        result = self.mistral_functions.compare_images_mistral(image1, image2, chat_history)
+        self.assertIn("Image comparison", result[-1][1])
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+# Inhalt der Datei: test_ollama_functions.py
+################################################################################
+
+import unittest
+from unittest.mock import MagicMock
+from ollama_functions import OllamaFunctions
+
+class TestOllamaFunctions(unittest.TestCase):
+    def setUp(self):
+        self.ollama_functions = OllamaFunctions()
+
+    def test_clean_output(self):
+        output = "\x1B[1mThis is bold text\x1B[0m"
+        result = self.ollama_functions.clean_output(output)
+        self.assertNotIn("\x1B", result)
+
+    def test_format_as_codeblock(self):
+        output = "This is a code block"
+        result = self.ollama_functions.format_as_codeblock(output)
+        self.assertIn("```", result)
+
+    def test_format_output(self):
+        output = "This is a long text that needs to be formatted with line breaks and code blocks."
+        result = self.ollama_functions.format_output(output)
+        self.assertIn("\n", result)
+
+    def test_run_ollama_live(self):
+        prompt = "Generate a response"
+        model = "ollama-model"
+        self.ollama_functions.run_ollama_live = MagicMock(return_value=iter(["Response part 1", "Response part 2"]))
+
+        result = list(self.ollama_functions.run_ollama_live(prompt, model))
+        self.assertIn("Response part 1", result[0])
+        self.assertIn("Response part 2", result[1])
+
+    def test_process_uploaded_file(self):
+        file = MagicMock()
+        file.name = "test.txt"
+        file.read = MagicMock(return_value="File content")
+
+        result = self.ollama_functions.process_uploaded_file(file)
+        self.assertEqual(result, "File content")
+
+    def test_compare_documents(self):
+        file1 = MagicMock()
+        file2 = MagicMock()
+        file1.name = "test1.txt"
+        file2.name = "test2.txt"
+        file1.read = MagicMock(return_value="File 1 content")
+        file2.read = MagicMock(return_value="File 2 content")
+
+        result = self.ollama_functions.compare_documents(file1, file2)
+        self.assertIn("File 1 content", result)
+        self.assertIn("File 2 content", result)
+
+    def test_chatbot_interface(self):
+        input_text = "Generate a response"
+        model = "ollama-model"
+        self.ollama_functions.run_ollama_live = MagicMock(return_value=iter(["Response part 1", "Response part 2"]))
+
+        result = list(self.ollama_functions.chatbot_interface(input_text, model))
+        self.assertIn("Response part 1", result[0][1])
+        self.assertIn("Response part 2", result[1][1])
+
+if __name__ == "__main__":
+    unittest.main()
+
+
