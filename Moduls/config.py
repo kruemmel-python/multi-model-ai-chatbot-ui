@@ -1,6 +1,7 @@
 import os
 import torch
 from dotenv import load_dotenv
+import json
 
 # Lade die Umgebungsvariablen aus der .env-Datei
 load_dotenv()
@@ -39,3 +40,30 @@ STATUS_MESSAGE_ERROR = "Fehler: Die Anfrage konnte nicht verarbeitet werden."
 
 SAVE_DIR = ".gradio"
 SAVE_FILE = os.path.join(SAVE_DIR, "save.json")
+CONFIG_FILE = os.path.join(SAVE_DIR, "config.json")
+
+# --- Standardkonfigurationen ---
+DEFAULT_CONFIG = {
+    "enable_tts": False,
+    "tts_speed": 150,  # Standardgeschwindigkeit für TTS
+    "tts_volume": 0.9,  # Standardlautstärke für TTS
+    "tts_voice": "com.apple.speech.synthesis.voice.Alex"  # Standardstimme für TTS (kann je nach Betriebssystem variieren)
+}
+
+def load_config() -> dict:
+    """Lädt die Konfiguration aus einer JSON-Datei."""
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            return DEFAULT_CONFIG
+    return DEFAULT_CONFIG
+
+def save_config(config: dict):
+    """Speichert die Konfiguration in einer JSON-Datei."""
+    os.makedirs(SAVE_DIR, exist_ok=True)
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(config, f, indent=4)
+
+config = load_config()

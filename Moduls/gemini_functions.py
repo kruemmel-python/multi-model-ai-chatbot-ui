@@ -1,32 +1,56 @@
-from PIL import Image
-from typing import Optional, Generator, List, Tuple
-from helpers import encode_image, format_chat_message
-from api_client import api_client
-from audio_processing import process_audio
+import asyncio
+import logging
 import os
-import google.generativeai as genai
-from pygments import highlight
-from pygments.lexers import PythonLexer
-from pygments.formatters import HtmlFormatter
-from black import format_str, FileMode
 from functools import lru_cache
-from loguru import logger
+from typing import List, Tuple, Optional, Generator
+import google.generativeai as genai
+from PIL import Image
+from pygments import highlight
+from pygments.formatters import HtmlFormatter
+from pygments.lexers import PythonLexer
+from black import format_str, FileMode
+from helpers import format_chat_message  # Import der format_chat_message-Funktion
+from api_client import api_client
+from config import config
+from gtts import gTTS
+from playsound import playsound
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 class GeminiFunctions:
-    """
-    Klasse zur Verwaltung der Gemini API-Funktionalitäten.
-
-    Diese Klasse bietet Methoden zur Analyse und Verbesserung von Python-Code mithilfe des Gemini-Modells.
-
-    Attributes:
-        model (genai.GenerativeModel): Das Gemini-Modell.
-    """
-
     def __init__(self):
-        """
-        Initialisiert die GeminiFunctions.
-        """
         pass
+
+    def _speak_text(self, text: str, config: dict) -> None:
+        """
+        Konvertiert Text in Sprache und spielt diese ab.
+
+        Args:
+            text (str): Der zu sprechende Text.
+            config (dict): Die Konfiguration für TTS (Geschwindigkeit, Lautstärke, Stimme).
+        """
+        try:
+            tts = gTTS(text, lang='de')
+            temp_file = "temp_tts.mp3"
+            temp_file_path = os.path.join(os.path.dirname(__file__), temp_file)
+            tts.save(temp_file_path)
+            logger.debug(f"TTS Datei gespeichert: {temp_file_path}")
+
+            # Verwenden Sie playsound zum Abspielen der MP3-Datei
+            playsound(temp_file_path)
+
+            os.remove(temp_file_path)
+            logger.debug(f"Temporäre Datei gelöscht: {temp_file_path}")
+        except Exception as e:
+            logger.error(f"Error during TTS conversion: {e}")
+
+    async def _async_speak_text(self, text: str, config: dict):
+        """
+        Asynchrone Funktion zum Sprechen von Text.
+        """
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self._speak_text, text, config)
 
     def upload_to_gemini(self, image: Image.Image):
         """
@@ -57,7 +81,8 @@ class GeminiFunctions:
         user_input: str,
         chat_history: List[Tuple[str, str]],
         image: Optional[Image.Image] = None,
-        audio_file: Optional[str] = None
+        audio_file: Optional[str] = None,
+        enable_tts: bool = False  # Neues Argument hinzugefügt
     ) -> Generator[Tuple[List[Tuple[str, str]], str], None, None]:
         """
         Chattet mit dem Gemini-Modell.
@@ -67,6 +92,7 @@ class GeminiFunctions:
             chat_history (List[Tuple[str, str]]): Der Chatverlauf.
             image (Optional[Image.Image]): Das hochzuladende Bild.
             audio_file (Optional[str]): Der Pfad zur Audiodatei.
+            enable_tts (bool): Aktiviert oder deaktiviert TTS.
 
         Yields:
             Tuple[List[Tuple[str, str]], str]: Der aktualisierte Chatverlauf und die Antwort.
@@ -100,7 +126,11 @@ class GeminiFunctions:
         try:
             chat_session = api_client.gemini_model.start_chat(history=history)
             response_text = chat_session.send_message(user_input).text
-            chat_history.append((None, format_chat_message(response_text)))
+            chat_history.append((None, format_chat_message(response_text)))  # Entfernt `speak=enable_tts`
+            yield chat_history, ""
+
+            if enable_tts:
+                asyncio.run(self._async_speak_text(response_text, config))
         except Exception as e:
             chat_history.append((None, f"Fehler bei der Verarbeitung der Anfrage: {e}"))
 
@@ -125,7 +155,7 @@ class GeminiFunctions:
             sample_file = self.upload_to_gemini(image)
             response = api_client.gemini_model.generate_content([f"{user_input} Beschreiben Sie das Bild mit einer kreativen Beschreibung. Bitte in German antworten.", sample_file])
             response_text = response.text
-            chat_history.append((None, format_chat_message(response_text)))
+            chat_history.append((None, format_chat_message(response_text)))  # Entfernt `speak=config.get("enable_tts", False)`
         except Exception as e:
             chat_history.append((None, f"Fehler bei der Bildanalyse: {e}"))
 

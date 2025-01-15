@@ -4,7 +4,8 @@ from gemini_functions import gemini_functions
 from chat_manager import chat_manager
 from ollama_functions import ollama_functions
 from file_creator import file_creator
-from config import OLLAMA_MODELS, DEFAULT_OLLAMA_MODEL, STATUS_MESSAGE_GENERATING, STATUS_MESSAGE_COMPLETE, STATUS_MESSAGE_ERROR
+from api_client import api_client
+from config import OLLAMA_MODELS, DEFAULT_OLLAMA_MODEL, STATUS_MESSAGE_GENERATING, STATUS_MESSAGE_COMPLETE, STATUS_MESSAGE_ERROR, config
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
@@ -169,15 +170,17 @@ def create_gradio_interface():
                         gemini_delete_chat_button = gr.Button("Ausgewählten Chat löschen")
                         gemini_delete_all_chats_button = gr.Button("Alle Chats löschen")
 
+                gemini_enable_tts = gr.Checkbox(label="TTS aktivieren", value=config.get("enable_tts", False))
+
                 gemini_submit_btn.click(
                     gemini_functions.chat_with_gemini,
-                    inputs=[gemini_user_input, gemini_state, gemini_image_upload, gemini_audio_upload],
+                    inputs=[gemini_user_input, gemini_state, gemini_image_upload, gemini_audio_upload, gemini_enable_tts],
                     outputs=[gemini_chatbot, gemini_user_input]
                 )
 
                 gemini_analyze_btn.click(
-                    lambda image, chat_history, user_input: gemini_functions.analyze_image_gemini(image, chat_history, user_input),
-                    inputs=[gemini_image_upload, gemini_state, gemini_user_input],
+                    lambda image, chat_history, user_input, tts_enabled: gemini_functions.analyze_image_gemini(image, chat_history, user_input, tts_enabled),
+                    inputs=[gemini_image_upload, gemini_state, gemini_user_input, gemini_enable_tts],
                     outputs=[gemini_chatbot]
                 )
                 gemini_clear_chat_button.click(chat_manager.clear_chat, inputs=[gemini_state], outputs=[gemini_chatbot])
@@ -276,4 +279,4 @@ def create_gradio_interface():
 
 if __name__ == '__main__':
     demo = create_gradio_interface()
-    demo.launch(share=True, server_name="localhost", server_port=4379)
+    demo.launch(share=True, server_name="localhost", server_port=2379)

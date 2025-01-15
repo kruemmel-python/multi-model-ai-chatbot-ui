@@ -8,7 +8,6 @@ from pygments.lexers import PythonLexer
 from pygments.formatters import HtmlFormatter
 from dotenv import load_dotenv
 from functools import lru_cache
-from loguru import logger
 from black import format_str, FileMode
 from typing import Optional
 from logging_config import setup_logging
@@ -29,15 +28,6 @@ if not GEMINI_API_KEY:
 def setup_api(gemini_api_key: str) -> Optional[genai.GenerativeModel]:
     """
     Konfiguriert die Gemini API mit dem bereitgestellten API-Schlüssel.
-
-    Args:
-        gemini_api_key (str): Der API-Schlüssel für Gemini.
-
-    Returns:
-        Optional[genai.GenerativeModel]: Das konfigurierte Gemini-Modell.
-
-    Raises:
-        SystemExit: Wenn die Konfiguration fehlschlägt.
     """
     try:
         if not gemini_api_key:
@@ -58,12 +48,6 @@ model = setup_api(GEMINI_API_KEY)
 def format_code(code_input: str) -> str:
     """
     Formatiert den gegebenen Python-Code mit Pygments.
-
-    Args:
-        code_input (str): Der Eingabe-Code.
-
-    Returns:
-        str: Der formatierte Code.
     """
     try:
         formatter = HtmlFormatter(style='colorful')
@@ -76,10 +60,6 @@ def format_code(code_input: str) -> str:
 def save_code(code_input: str, filename: str) -> None:
     """
     Speichert den gegebenen Code in einer Datei.
-
-    Args:
-        code_input (str): Der Eingabe-Code.
-        filename (str): Der Dateiname.
     """
     with open(filename, 'w') as file:
         file.write(code_input)
@@ -87,12 +67,6 @@ def save_code(code_input: str, filename: str) -> None:
 def load_code(filename: str) -> str:
     """
     Lädt den Code aus einer Datei.
-
-    Args:
-        filename (str): Der Dateiname.
-
-    Returns:
-        str: Der geladene Code.
     """
     with open(filename, 'r') as file:
         return file.read()
@@ -100,12 +74,6 @@ def load_code(filename: str) -> str:
 def format_code_with_black(code_input: str) -> str:
     """
     Formatiert den gegebenen Code mit Black.
-
-    Args:
-        code_input (str): Der Eingabe-Code.
-
-    Returns:
-        str: Der formatierte Code.
     """
     try:
         formatted_code = format_str(code_input, mode=FileMode())
@@ -118,19 +86,11 @@ def format_code_with_black(code_input: str) -> str:
 class GeminiFunctions:
     """
     Klasse zur Verwaltung der Gemini API-Funktionalitäten.
-
-    Diese Klasse bietet Methoden zur Analyse und Verbesserung von Python-Code mithilfe des Gemini-Modells.
-
-    Attributes:
-        model (genai.GenerativeModel): Das Gemini-Modell.
     """
 
     def __init__(self, model: genai.GenerativeModel):
         """
         Initialisiert die GeminiFunctions mit dem angegebenen Modell.
-
-        Args:
-            model (genai.GenerativeModel): Das Gemini-Modell.
         """
         self.model = model
 
@@ -138,12 +98,6 @@ class GeminiFunctions:
     def analyze_code(self, code_input: str) -> str:
         """
         Analysiert den gegebenen Python-Code und gibt Feedback.
-
-        Args:
-            code_input (str): Der Eingabe-Code.
-
-        Returns:
-            str: Das Feedback zum Code.
         """
         try:
             prompt = f"Analysiere diesen Python-Code und gib Feedback:\n\n{code_input}\n\nAntworte auf Deutsch und mit Zeilenumbrüchen."
@@ -157,12 +111,6 @@ class GeminiFunctions:
     def suggest_code_improvements(self, code_input: str) -> str:
         """
         Schlägt Verbesserungen für den gegebenen Python-Code vor.
-
-        Args:
-            code_input (str): Der Eingabe-Code.
-
-        Returns:
-            str: Die vorgeschlagenen Verbesserungen.
         """
         try:
             prompt = f"Schlage Verbesserungen für diesen Python-Code vor:\n\n{code_input}\n\nAntworte auf Deutsch und mit Zeilenumbrüchen."
@@ -175,9 +123,6 @@ class GeminiFunctions:
 def update_model(model_name: str) -> None:
     """
     Aktualisiert das Gemini-Modell basierend auf der Auswahl.
-
-    Args:
-        model_name (str): Der Name des ausgewählten Modells.
     """
     global model
     model = setup_api(GEMINI_API_KEY)
@@ -189,9 +134,6 @@ gemini_functions = GeminiFunctions(model)
 def create_app() -> gr.Blocks:
     """
     Erstellt die Gradio-Benutzeroberfläche.
-
-    Returns:
-        gr.Blocks: Die erstellte Gradio-Benutzeroberfläche.
     """
     with gr.Blocks(css="style.css") as app:
         gr.Markdown("""
