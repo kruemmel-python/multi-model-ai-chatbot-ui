@@ -84,7 +84,7 @@ class GeminiFunctions:
         image: Optional[Image.Image] = None,
         audio_file: Optional[str] = None,
         enable_tts: bool = False  # Neues Argument hinzugefügt
-    ) -> Generator[Tuple[List[Tuple[str, str]], str], None, None]:
+    ) -> Tuple[List[Tuple[str, str]], str]:
         """
         Chattet mit dem Gemini-Modell.
 
@@ -95,23 +95,20 @@ class GeminiFunctions:
             audio_file (Optional[str]): Der Pfad zur Audiodatei.
             enable_tts (bool): Aktiviert oder deaktiviert TTS.
 
-        Yields:
+        Returns:
             Tuple[List[Tuple[str, str]], str]: Der aktualisierte Chatverlauf und die Antwort.
         """
         if not user_input.strip() and not audio_file:
-            yield chat_history, "Bitte geben Sie eine Nachricht ein oder laden Sie eine Audiodatei hoch."
-            return
+            return chat_history, "Bitte geben Sie eine Nachricht ein oder laden Sie eine Audiodatei hoch."
 
         if audio_file:
             try:
                 user_input = process_audio(audio_file)
             except Exception as e:
                 chat_history.append((None, f"Fehler bei der Verarbeitung der Audiodatei: {e}"))
-                yield chat_history, ""
-                return
+                return chat_history, ""
 
         chat_history.append((user_input, None))
-        yield chat_history, ""
 
         history = [{"role": "user", "parts": [user_input]}]
 
@@ -121,21 +118,21 @@ class GeminiFunctions:
                 history[0]["parts"].append(sample_file)
             except Exception as e:
                 chat_history.append((None, f"Fehler beim Hochladen des Bildes: {e}"))
-                yield chat_history, ""
-                return
+                return chat_history, ""
 
         try:
             chat_session = api_client.gemini_model.start_chat(history=history)
             response_text = chat_session.send_message(user_input).text
-            chat_history.append((None, format_chat_message(response_text)))  # Entfernt `speak=enable_tts`
-            yield chat_history, ""
+            chat_history.append((None, format_chat_message(response_text)))
 
             if enable_tts:
                 asyncio.run(self._async_speak_text(response_text, config))
+
         except Exception as e:
             chat_history.append((None, f"Fehler bei der Verarbeitung der Anfrage: {e}"))
 
-        yield chat_history, ""
+        return chat_history, ""
+
 
     def analyze_image_gemini(self, image: Optional[Image.Image], chat_history: List[Tuple[str, str]], user_input: str) -> List[Tuple[str, str]]:
         """

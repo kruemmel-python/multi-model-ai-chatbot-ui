@@ -24,7 +24,7 @@ class MistralFunctions:
         """
         pass
 
-    def chat_with_mistral(self, user_input: str, chat_history: List[Tuple[str, str]], image: Optional[Image.Image] = None, audio_file: Optional[str] = None) -> Generator[Tuple[List[Tuple[str, str]], str], None, None]:
+    def chat_with_mistral(self, user_input: str, chat_history: List[Tuple[str, str]], image: Optional[Image.Image] = None, audio_file: Optional[str] = None) -> Tuple[List[Tuple[str, str]], str]:
         """
         Chattet mit dem Mistral-Modell.
 
@@ -34,23 +34,20 @@ class MistralFunctions:
             image (Optional[Image.Image]): Das hochzuladende Bild.
             audio_file (Optional[str]): Der Pfad zur Audiodatei.
 
-        Yields:
+        Returns:
             Tuple[List[Tuple[str, str]], str]: Der aktualisierte Chatverlauf und die Antwort.
         """
         if not user_input.strip() and not audio_file:
-            yield chat_history, "Bitte geben Sie eine Nachricht ein oder laden Sie eine Audiodatei hoch."
-            return
+            return chat_history, "Bitte geben Sie eine Nachricht ein oder laden Sie eine Audiodatei hoch."
 
         if audio_file:
             try:
                 user_input = process_audio(audio_file)
             except Exception as e:
                 chat_history.append((None, f"Fehler bei der Verarbeitung der Audiodatei: {e}"))
-                yield chat_history, ""
-                return
+                return chat_history, ""
 
         chat_history.append((user_input, None))
-        yield chat_history, ""
 
         messages = [{"role": "user", "content": user_input}]
 
@@ -63,8 +60,7 @@ class MistralFunctions:
                 ]
             except Exception as e:
                 chat_history.append((None, f"Fehler beim Hochladen des Bildes: {e}"))
-                yield chat_history, ""
-                return
+                return chat_history, ""
 
         try:
             headers = {
@@ -100,23 +96,21 @@ class MistralFunctions:
                                     full_response += delta_content
                                     formatted_response = format_chat_message(full_response)
                                     chat_history[-1] = (user_input, formatted_response)
-                                    yield chat_history, ""
                     except json.JSONDecodeError as e:
                         logger.error(f"JSON Decode Fehler: {e} - Ungültiger Chunk: {chunk}")
                         continue
 
             if full_response:
                 chat_history[-1] = (user_input, format_chat_message(full_response))
-                yield chat_history, ""
             else:
                 chat_history.append((None, "Keine Antwort vom Modell erhalten."))
-                yield chat_history, ""
+
         except requests.exceptions.RequestException as e:
             chat_history.append((None, f"Fehler bei der Verarbeitung der Anfrage: {e}"))
-            yield chat_history, ""
         except Exception as e:
             chat_history.append((None, f"Unbekannter Fehler: {e}. Bitte versuchen Sie es nochmal."))
-            yield chat_history, ""
+
+        return chat_history, ""
 
     def analyze_image_mistral(self, image: Optional[Image.Image], chat_history: List[Tuple[str, str]], user_input: str, prompt: str) -> List[Tuple[str, str]]:
         """
