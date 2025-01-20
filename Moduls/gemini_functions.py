@@ -14,6 +14,7 @@ from api_client import api_client
 from config import config
 from gtts import gTTS
 from playsound import playsound
+from audio_processing import process_audio  # Import der process_audio-Funktion
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -153,7 +154,7 @@ class GeminiFunctions:
             return chat_history
         try:
             sample_file = self.upload_to_gemini(image)
-            response = api_client.gemini_model.generate_content([f"{user_input} Beschreiben Sie das Bild mit einer kreativen Beschreibung. Bitte in German antworten.", sample_file])
+            response = api_client.gemini_model.generate_content([f"{user_input} Beschreiben Sie das Bild mit einer kreativen Beschreibung. Bitte in Deutsch antworten.", sample_file])
             response_text = response.text
             chat_history.append((None, format_chat_message(response_text)))  # Entfernt `speak=config.get("enable_tts", False)`
         except Exception as e:

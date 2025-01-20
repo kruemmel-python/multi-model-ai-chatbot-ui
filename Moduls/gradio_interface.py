@@ -1,4 +1,5 @@
 import gradio as gr
+from file_component import FComponent
 from mistral_functions import mistral_functions
 from gemini_functions import gemini_functions
 from chat_manager import chat_manager
@@ -82,7 +83,12 @@ def create_gradio_interface():
                             mistral_compare_btn = gr.Button("Bilder vergleichen")
 
                 mistral_submit_btn.click(
-                    mistral_functions.chat_with_mistral,
+                    lambda user_input, chat_history, image, audio_upload: mistral_functions.chat_with_mistral(
+                        user_input=user_input,
+                        chat_history=chat_history,
+                        image=image,
+                        audio_file=audio_upload if audio_upload else None,
+                    ),
                     inputs=[mistral_user_input, mistral_state, mistral_image_upload, mistral_audio_upload],
                     outputs=[mistral_chatbot, mistral_user_input]
                 )
@@ -173,7 +179,13 @@ def create_gradio_interface():
                 gemini_enable_tts = gr.Checkbox(label="TTS aktivieren", value=config.get("enable_tts", False))
 
                 gemini_submit_btn.click(
-                    gemini_functions.chat_with_gemini,
+                    lambda user_input, chat_history, image, audio_upload, enable_tts: gemini_functions.chat_with_gemini(
+                        user_input=user_input,
+                        chat_history=chat_history,
+                        image=image,
+                        audio_file=audio_upload if audio_upload else None,
+                        enable_tts=enable_tts
+                    ),
                     inputs=[gemini_user_input, gemini_state, gemini_image_upload, gemini_audio_upload, gemini_enable_tts],
                     outputs=[gemini_chatbot, gemini_user_input]
                 )
@@ -202,8 +214,8 @@ def create_gradio_interface():
             with gr.TabItem("Ollama Chatbot"):
                 ollama_input_text = gr.Textbox(lines=2, placeholder="Geben Sie Ihre Frage an Ollama ein", label="Eingabe (oder Datei hochladen)")
                 ollama_model_selector = gr.Dropdown(choices=OLLAMA_MODELS, value=DEFAULT_OLLAMA_MODEL, label="Modell auswählen")
-                ollama_file_upload1 = gr.File(label="Datei 1 hochladen (PDF oder TXT)", file_types=[".txt", ".pdf"])
-                ollama_file_upload2 = gr.File(label="Datei 2 hochladen (PDF oder TXT)", file_types=[".txt", ".pdf"])
+                ollama_file_upload1 = FComponent().component  # Verwenden Sie die FComponent-Komponente
+                ollama_file_upload2 = FComponent().component  # Verwenden Sie die FComponent-Komponente
                 ollama_audio_upload = gr.Audio(type="filepath", label="Audio hochladen")
                 ollama_output = gr.Markdown(label="Antwort")
                 ollama_status = gr.Label(label="Status")

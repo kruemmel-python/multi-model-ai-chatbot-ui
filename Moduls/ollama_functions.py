@@ -112,7 +112,7 @@ class OllamaFunctions:
 
     def process_uploaded_file(self, file: gr.File) -> str:
         """
-        Verarbeitet hochgeladene TXT- und PDF-Dateien.
+        Verarbeitet hochgeladene TXT-, PDF-, und andere textbasierte Dateien.
 
         Args:
             file (gr.File): Die hochgeladene Datei.
@@ -136,8 +136,17 @@ class OllamaFunctions:
             except Exception as e:
                 logger.error(f"Fehler beim Lesen der PDF-Datei: {e}")
                 raise ValueError(f"Fehler beim Lesen der PDF-Datei: {e}")
+        elif file.name.endswith((".py", ".cpp", ".h", ".c", ".java", ".js", ".cs", ".go", ".html", ".css", ".md", ".json", ".xml", ".yaml", ".sh")):
+            try:
+                with open(file.name, 'r', encoding='utf-8') as f:
+                    return f.read()
+            except Exception as e:
+                logger.error(f"Fehler beim Lesen der Datei: {e}")
+                raise ValueError(f"Fehler beim Lesen der Datei: {e}")
         else:
-            raise ValueError("Nur TXT- und PDF-Dateien werden unterstützt.")
+            raise ValueError("Nur TXT-, PDF- und andere textbasierte Dateien werden unterstützt.")
+
+
 
     def compare_documents(self, file1: gr.File, file2: gr.File) -> str:
         """

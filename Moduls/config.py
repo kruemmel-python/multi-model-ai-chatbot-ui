@@ -23,7 +23,7 @@ MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions"
 
 OLLAMA_MODELS = [
     "phi4-model:latest",
-    "phi4:latest",
+    "gemma2:2b",
     "wizardlm2:7b-fp16",
     "unzensiert:latest",
     "llama2-uncensored:7b-chat-q8_0",
@@ -33,7 +33,7 @@ OLLAMA_MODELS = [
     "llama2-uncensored:latest"
 ]
 
-DEFAULT_OLLAMA_MODEL = "phi4:latest"
+DEFAULT_OLLAMA_MODEL = "gemma2:2b"
 STATUS_MESSAGE_GENERATING = "Antwort wird generiert..."
 STATUS_MESSAGE_COMPLETE = "Antwort generiert."
 STATUS_MESSAGE_ERROR = "Fehler: Die Anfrage konnte nicht verarbeitet werden."
