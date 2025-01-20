@@ -134,7 +134,7 @@ class GeminiFunctions:
         return chat_history, ""
 
 
-    def analyze_image_gemini(self, image: Optional[Image.Image], chat_history: List[Tuple[str, str]], user_input: str) -> List[Tuple[str, str]]:
+    def analyze_image_gemini(self, image: Optional[Image.Image], chat_history: List[Tuple[str, str]], user_input: str, tts_enabled: bool) -> List[Tuple[str, str]]:
         """
         Analysiert ein Bild mit Gemini.
 
@@ -142,6 +142,7 @@ class GeminiFunctions:
             image (Optional[Image.Image]): Das zu analysierende Bild.
             chat_history (List[Tuple[str, str]]): Der Chatverlauf.
             user_input (str): Die Benutzereingabe.
+            tts_enabled (bool): Aktiviert oder deaktiviert TTS.
 
         Returns:
             List[Tuple[str, str]]: Der aktualisierte Chatverlauf.
@@ -158,6 +159,7 @@ class GeminiFunctions:
             chat_history.append((None, f"Fehler bei der Bildanalyse: {e}"))
 
         return chat_history
+
 
     def format_code(self, code_input: str) -> str:
         """

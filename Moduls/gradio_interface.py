@@ -98,6 +98,7 @@ def create_gradio_interface():
                     inputs=[mistral_image_upload, mistral_state, mistral_user_input],
                     outputs=[mistral_chatbot]
                 )
+
                 mistral_clear_chat_button.click(chat_manager.clear_chat, inputs=[mistral_state], outputs=[mistral_chatbot])
                 mistral_save_chat_button.click(chat_manager.save_chat, inputs=[mistral_state, mistral_saved_chats], outputs=[mistral_saved_chats])
                 mistral_new_chat_button.click(chat_manager.new_chat, inputs=[mistral_saved_chats], outputs=[mistral_chatbot, mistral_saved_chats])
@@ -195,6 +196,8 @@ def create_gradio_interface():
                     inputs=[gemini_image_upload, gemini_state, gemini_user_input, gemini_enable_tts],
                     outputs=[gemini_chatbot]
                 )
+
+
                 gemini_clear_chat_button.click(chat_manager.clear_chat, inputs=[gemini_state], outputs=[gemini_chatbot])
                 gemini_save_chat_button.click(chat_manager.save_chat, inputs=[gemini_state, gemini_saved_chats], outputs=[gemini_saved_chats])
                 gemini_new_chat_button.click(chat_manager.new_chat, inputs=[gemini_saved_chats], outputs=[gemini_chatbot, gemini_saved_chats])
